@@ -42,7 +42,7 @@ docker compose up -d --wait
 
 ## 获取可信浏览器指纹
 
-在浏览器打开 https://idas.uestc.edu.cn，登录本人账号并按学校提示完成验证、信任该浏览器。按 F12，在 **Application / 应用程序 → Storage / 存储 → Cookies → https://idas.uestc.edu.cn** 找到：
+在浏览器打开 [学校统一认证](https://idas.uestc.edu.cn/authserver/login)，登录本人账号并按学校提示完成验证、信任该浏览器。按 F12，在 **Application / 应用程序 → Storage / 存储 → Cookies → https://idas.uestc.edu.cn** 找到：
 
 ```text
 MULTIFACTOR_BROWSER_FINGERPRINT
