@@ -1,0 +1,33 @@
+{
+  "preset_id": "xuezhi_group3",
+  "display_name": "学知三组团",
+  "input": {
+    "longitude": 103.930739,
+    "latitude": 30.757413,
+    "coordinate_system": "wgs84"
+  },
+  "source": {
+    "type": "user_supplied_screenshot",
+    "filename": "Screenshot_2026-10-18-19-57-19-835_make.more.r2d.jpg",
+    "sha256": "ad6ee1ba2537a3daaf5a71fb74712c260a016033e8912204c7564167372c5281",
+    "reported_accuracy_meter": 40,
+    "provider_label": "NETWORK",
+    "address": "中国四川省成都市郫都区合作街道银杏大道"
+  },
+  "conversion": {
+    "method": "offline_approximation",
+    "official_provider_validation": false,
+    "reference": {
+      "coordtransform.cjs": {
+        "url": "https://raw.githubusercontent.com/wandergis/coordtransform/master/index.js",
+        "sha256": "e941a1a5825c1a615eb3e986a0bfa95b5cba03f6aa89fb20cf3be33259fb897c"
+      },
+      "LICENSE": {
+        "url": "https://raw.githubusercontent.com/wandergis/coordtransform/master/LICENSE",
+        "sha256": "801448faad6ec70fbd0d1bf384f6b20cdbd332f333898b1b8122ec26cb0b5d79"
+      }
+    }
+  },
+  "school_validation": "not performed",
+  "screenshot_included_in_source_package": false
+}

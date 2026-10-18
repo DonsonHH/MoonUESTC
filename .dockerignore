@@ -1,0 +1,15 @@
+**
+!Dockerfile
+!requirements.txt
+!moonuestc/
+!moonuestc/**
+!tests/
+!tests/**
+!third_party/
+!third_party/**
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+!COORDINATE-SOURCE.json
+!config.example.json
+!location.example.json
+!location.custom.example.json

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "automation_enabled": false,
+  "run_at": "22:00",
+  "account_gap_seconds": 20,
+  "accounts": [
+    {
+      "id": "me",
+      "enabled": true,
+      "student_id": "PUT_YOUR_STUDENT_ID_HERE",
+      "password": "PUT_YOUR_PASSWORD_HERE",
+      "browser_fingerprint": "PUT_YOUR_32_HEX_TRUSTED_BROWSER_FINGERPRINT_HERE",
+      "user_agent": "PUT_THE_USER_AGENT_FROM_YOUR_TRUSTED_BROWSER_HERE",
+      "location": {
+        "mode": "preset",
+        "preset": "xuezhi_group3"
+      }
+    }
+  ]
+}

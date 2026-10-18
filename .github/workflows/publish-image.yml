@@ -1,0 +1,58 @@
+name: Publish validated server image
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, for example v0.4.1
+        required: true
+        default: v0.4.1
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: publish-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Download and verify artifacts built and tested on the release server
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          version="${TAG#v}"
+          asset="MoonUESTC-${TAG}-linux-amd64.image.tar.gz"
+          mkdir artifacts
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --pattern 'SHA256SUMS.release.txt' --dir artifacts
+          cd artifacts
+          grep -E "^[a-f0-9]{64}  ${asset//./\.}$" SHA256SUMS.release.txt > image.sha256
+          test "$(wc -l < image.sha256)" -eq 1
+          sha256sum -c image.sha256
+          docker load --input "$asset"
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/moonuestc:$version"
+          revision="$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)"
+          test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$revision"
+          test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.version"}}')" = "$version"
+          test "$(docker image inspect "$image" --format '{{.Architecture}}')" = amd64
+          test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.source"}}')" = "https://github.com/$GITHUB_REPOSITORY"
+          printf 'RELEASE_IMAGE=%s\nRELEASE_VERSION=%s\n' "$image" "$version" >> "$GITHUB_ENV"
+      - name: Publish the validated image to GHCR
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          docker push "$RELEASE_IMAGE"
+          namespace="${RELEASE_IMAGE%:*}"
+          minor="${RELEASE_VERSION%.*}"
+          docker tag "$RELEASE_IMAGE" "$namespace:$minor"
+          docker tag "$RELEASE_IMAGE" "$namespace:latest"
+          docker push "$namespace:$minor"
+          docker push "$namespace:latest"
+          printf '## Published\n\n`%s`\n\nFirst publication: set the package visibility to Public in GitHub package settings.\n' "$RELEASE_IMAGE" >> "$GITHUB_STEP_SUMMARY"

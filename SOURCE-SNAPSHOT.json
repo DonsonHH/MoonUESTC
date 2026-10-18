@@ -1,0 +1,22 @@
+{
+  "inspected_date": "2026-10-18",
+  "source": "user-supplied extracted ZIP directories; commit IDs not independently established",
+  "files": {
+    "GoodNight-main/README.md": "4698f49015b1614bf140258e16f3d0fcc99b944b124946c0ab0f46a6eba52a17",
+    "GoodNight-main/src/adapters/uestc.mjs": "8ebc7d87bcb4081b9d7faaf51278b5baa0fbe7c235932840f55b66fb8eed7b48",
+    "GoodNight-main/src/runner.mjs": "eb95ffe74ea888b56a343a85bacf9d77370bc5ebff3a5c9104cbcc05f31cf54b",
+    "GoodNight-main/src/store.mjs": "6db687d091e086ec3da73b7839a580d3a731e0334f67ddd3dff4e549520ba90d",
+    "GoodNight-main/src/policy.mjs": "52497fb44d1d36582026ee13f7bda8dcf1c955c039623b56fef1062b837c5f5f",
+    "GoodNight-main/LICENSE": "ea20798943062df03027be04bffca608f1b5661aa58aa0159cc145e1c6c4dd30",
+    "UESTC-MoonCheck-main/tools/pc_reference/wsc_cas.py": "31fcd9df88ab923a21057c0549d662c6a84d641fdb06c8491068805791056a7a",
+    "UESTC-MoonCheck-main/tools/pc_reference/wsc_http.py": "e00a8a12455dee6008b9ccba51769bff6e632128ecad032a7aaf25b5d01efa61",
+    "UESTC-MoonCheck-main/tools/pc_reference/wsc_checkin.py": "86afa6eb3ba182ad9ecff406b6f47c8db106246590327c0a0f5aaae5247b3dd1",
+    "UESTC-MoonCheck-main/tools/pc_reference/verify.py": "dcbc0d19efcea0e369c5c943921abbd06b974ffdc55ecc9d8f86646bd99b1749",
+    "UESTC-MoonCheck-main/firmware/src/cas_auth.cpp": "91ed7db00e8886f139f70b4f47c32eaccd7bedf336b398b1b72dc40f978a343a",
+    "UESTC-MoonCheck-main/firmware/src/checkin_api.cpp": "933ad1cf7defed457999500c3dfe0c6565fb5af38fb543870c969e0d39a39b56",
+    "UESTC-MoonCheck-main/firmware/src/checkin_service.cpp": "3286c6622f91e59c8046a2b7dd4c8a7977214af520f3a6179c4e1d99824da209",
+    "UESTC-MoonCheck-main/firmware/src/multi_checkin.cpp": "a5a04e5c4147f9366d1657d1fa51f2c2460f8d3a6f30641f9662406a2b34bb64",
+    "UESTC-MoonCheck-main/docs/api-contract.md": "dc226a0886d05508d2328280400bb2da21cc199fc62966ad708a8ba6c47790ff",
+    "UESTC-MoonCheck-main/LICENSE": "606f64b86fc1712203006f6cdedc4cb4b2eeb54688cd6460ca66941447132062"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "latitude": null,
+  "longitude": null,
+  "reverseGeocode": null,
+  "coordinateSystemCode": "gcj02",
+  "accuracy": null,
+  "locationDurationMs": null,
+  "networkTypeCode": null,
+  "locationEnabled": null,
+  "locationAuthorized": null,
+  "locationAccuracy": null,
+  "errorMessage": ""
+}

@@ -1,0 +1,26 @@
+ARG PYTHON_BASE_IMAGE=python:3.12-slim-bookworm
+FROM ${PYTHON_BASE_IMAGE}
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 TZ=Asia/Shanghai
+WORKDIR /app
+COPY requirements.txt ./
+RUN python -m pip install --no-cache-dir --only-binary=:all: -r requirements.txt
+COPY moonuestc ./moonuestc
+COPY tests ./tests
+COPY LICENSE THIRD_PARTY_NOTICES.md COORDINATE-SOURCE.json ./
+COPY config.example.json location.example.json location.custom.example.json ./
+COPY third_party ./third_party
+RUN python -m unittest discover -s tests -v \
+    && groupadd --gid 10001 moonuestc \
+    && useradd --uid 10001 --gid 10001 --no-create-home moonuestc \
+    && mkdir /data /config \
+    && chown 10001:10001 /data /config
+ARG VCS_REF=unreleased
+LABEL org.opencontainers.image.title="MoonUESTC" \
+      org.opencontainers.image.version="0.4.1" \
+      org.opencontainers.image.source="https://github.com/horoscope963852/MoonUESTC" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.licenses="MIT"
+USER 10001:10001
+ENTRYPOINT ["python", "-m", "moonuestc"]
+EXPOSE 8080
+CMD ["serve"]

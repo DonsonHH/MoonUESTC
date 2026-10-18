@@ -1,0 +1,21 @@
+# Runtime and private configuration
+.env
+.env.*
+!.env.example
+config/
+data/
+backups/
+release-artifacts/
+*.sqlite3*
+*.lwp
+*.log
+*.pem
+*.key
+*.p12
+*initial-admin*
+__pycache__/
+*.py[cod]
+.venv/
+# Private deployment records do not belong in the public repository.
+SHANGHAI-*
+AGENTS.md
