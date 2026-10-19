@@ -14,7 +14,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError,InvalidHashError
 
 from .errors import ToolError
-from .locations import location_details
+from .locations import DEFAULT_PRESET_ID,location_details,upgrade_group3_location
 from .policy import build_payload,clock_minutes,now,validate_config
 from .runner import account_key,cookie_path
 from .state import State
@@ -78,7 +78,28 @@ class WebStore:
                 CREATE TABLE IF NOT EXISTS web_login_limits(bucket TEXT PRIMARY KEY,count INTEGER NOT NULL,reset_at REAL NOT NULL);
                 CREATE TABLE IF NOT EXISTS web_cookies(binding TEXT PRIMARY KEY,payload BLOB NOT NULL);
                 CREATE TABLE IF NOT EXISTS web_audit(id INTEGER PRIMARY KEY,actor_id INTEGER,event TEXT,target TEXT,created_at REAL);
+                CREATE TABLE IF NOT EXISTS web_migrations(name TEXT PRIMARY KEY,applied_at REAL NOT NULL);
             ''')
+        self._upgrade_group3_accounts()
+
+    def _upgrade_group3_accounts(self):
+        # One atomic transaction; keep IDs, password hashes, account secrets,
+        # ownership, schedules, cookies and verification state unchanged.
+        migration='group3_gcj02_v050'
+        with self.db(True) as db:
+            if db.execute('SELECT 1 FROM web_migrations WHERE name=?',(migration,)).fetchone():
+                return
+            for row in db.execute('SELECT * FROM web_accounts').fetchall():
+                payload=self._payload(row)
+                old=payload.get('location')
+                updated=upgrade_group3_location(old,migrate_named=True)
+                if old==updated:
+                    continue
+                payload['location']=updated
+                db.execute('UPDATE web_accounts SET payload=? WHERE id=?',
+                           (self.vault.seal(payload,'account:'+row['id']),row['id']))
+                self._audit(db,None,'account_location_migrated',row['id'])
+            db.execute('INSERT INTO web_migrations VALUES(?,?)',(migration,time.time()))
 
     @contextlib.contextmanager
     def db(self,write=False):
@@ -126,6 +147,41 @@ class WebStore:
                 raise WebError(409,'username_exists','用户名已存在。') from None
             row=db.execute('SELECT * FROM web_users WHERE id=?',(cur.lastrowid,)).fetchone()
             self._audit(db,actor,'user_created',row['id'])
+            return public_user(row)
+
+    def register_user(self,data,remote_ip):
+        """Public signup always creates an ordinary user with a user-chosen password."""
+        if not isinstance(data,dict) or set(data)!={'username','password'}:
+            raise WebError(400,'invalid_fields','注册只接受用户名和密码。')
+        stamp=time.time()
+        buckets=[(self.vault.digest('registration_ip',str(remote_ip)),20,900),
+                 (self.vault.digest('registration_global','all'),60,3600)]
+        # Reserve the attempt atomically before the expensive password hash.
+        with self.db(True) as db:
+            if not db.execute("SELECT 1 FROM web_users WHERE role='admin' AND active=1 LIMIT 1").fetchone():
+                raise WebError(503,'not_initialized','管理员尚未初始化，请联系管理员。')
+            db.execute('DELETE FROM web_login_limits WHERE reset_at<=?',(stamp,))
+            for bucket,limit,window in buckets:
+                row=db.execute('SELECT * FROM web_login_limits WHERE bucket=?',(bucket,)).fetchone()
+                if row and row['count']>=limit:
+                    raise WebError(429,'registration_rate_limited','注册请求过多，请稍后重试。')
+            for bucket,limit,window in buckets:
+                db.execute('INSERT INTO web_login_limits VALUES(?,1,?) ON CONFLICT(bucket) DO UPDATE SET count=count+1',
+                           (bucket,stamp+window))
+        username=text(data.get('username'),'用户名',3,48)
+        if not re.fullmatch(r'[\w.@-]+',username):
+            raise WebError(400,'invalid_username','用户名可用中英文、数字、点、短横线或下划线。')
+        encoded=self.hasher.hash(login_password(data.get('password')))
+        with self.db(True) as db:
+            if not db.execute("SELECT 1 FROM web_users WHERE role='admin' AND active=1 LIMIT 1").fetchone():
+                raise WebError(503,'not_initialized','管理员尚未初始化，请联系管理员。')
+            try:
+                cur=db.execute("INSERT INTO web_users(username,username_key,display_name,password_hash,role,active,must_change_password,created_at) VALUES(?,?,?,?,'user',1,0,?)",
+                               (username,username.casefold(),username,encoded,stamp))
+            except sqlite3.IntegrityError:
+                raise WebError(409,'username_exists','用户名已存在，请换一个用户名。') from None
+            row=db.execute('SELECT * FROM web_users WHERE id=?',(cur.lastrowid,)).fetchone()
+            self._audit(db,row,'user_registered',row['id'])
             return public_user(row)
 
     def _verify(self,encoded,password):
@@ -286,7 +342,8 @@ class WebStore:
                 if key in data:
                     if key in ('password','browser_fingerprint') and data[key]=='' and old: continue
                     payload[key]=copy.deepcopy(data[key])
-            payload.setdefault('location',{'mode':'preset','preset':'xuezhi_group3'})
+            payload.setdefault('location',{'mode':'preset','preset':DEFAULT_PRESET_ID})
+            payload['location']=upgrade_group3_location(payload['location'])
             payload['id']=aid; payload['enabled']=True
             try:
                 validate_config({'version':1,'accounts':[payload]})

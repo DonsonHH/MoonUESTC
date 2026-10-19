@@ -23,4 +23,8 @@ PyCryptodome, Flask, Waitress, argon2-cffi and their dependencies retain their o
 
 ## Coordinates and assets
 
-The named campus preset uses user-provided coordinates. The original screenshot is not distributed. Coordinate conversion is an offline approximation rather than an official map calibration. Dashboard HTML, CSS, JavaScript and SVG are project code; no externally hosted fonts or JavaScript CDNs are used.
+The eight named campus presets use maintainer-provided AMap GCJ-02 coordinates. The original screenshot is not distributed. Coordinate conversion is an offline approximation rather than an official map calibration. Dashboard HTML, CSS, JavaScript and SVG are project code; no externally hosted fonts or JavaScript CDNs are used.
+
+## ALTCHA registration verification
+
+ALTCHA widget 3.4.1 is bundled locally from https://registry.npmjs.org/altcha/-/altcha-3.4.1.tgz under MIT. Its external CSS/worker build keeps resources on the instance origin; see third_party/ALTCHA.LICENSE and ALTCHA-SOURCE.json for license and exact source hashes. Official altcha Python library 2.3.0 is pinned in requirements.txt and its wheel includes its applicable license metadata. No ALTCHA Cloud or Sentinel service is called. The browser must support Web Crypto in a secure context (HTTPS or localhost).

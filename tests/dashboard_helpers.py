@@ -52,7 +52,7 @@ class WebCase(unittest.TestCase):
     def account_fields(self,student='202300000001',**kwargs):
         return {'label':'我的学校账号','student_id':student,'password':fixtures.ACCOUNT['password'],
                 'browser_fingerprint':fixtures.ACCOUNT['browser_fingerprint'],
-                'user_agent':fixtures.ACCOUNT['user_agent'],'location':{'mode':'preset','preset':'xuezhi_group3'},
+                'user_agent':fixtures.ACCOUNT['user_agent'],'location':{'mode':'preset','preset':'xuezhi_group3_amap'},
                 'enabled':True,'automatic':False,'run_at':'22:00',**kwargs}
 
     def add_account(self,owner=1,student='202300000001',**kwargs):

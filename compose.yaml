@@ -1,6 +1,6 @@
 services:
   moonuestc:
-    image: "${MOON_IMAGE:-ghcr.io/horoscope963852/moonuestc:0.4.1}"
+    image: "${MOON_IMAGE:-ghcr.io/horoscope963852/moonuestc:0.5.0}"
     user: "${PUID:-10001}:${PGID:-10001}"
     command: ["serve"]
     restart: unless-stopped
@@ -16,6 +16,7 @@ services:
       MOON_DATA: /data
       MOON_PUBLIC_URL: "${MOON_PUBLIC_URL:?Run install.sh or set MOON_PUBLIC_URL in .env}"
       MOON_ALLOW_INSECURE_HTTP: "${MOON_ALLOW_INSECURE_HTTP:-0}"
+      MOON_ALLOW_REGISTRATION: "${MOON_ALLOW_REGISTRATION:-1}"
     volumes:
       - type: bind
         source: "${MOON_CONFIG_DIR:-./config}"

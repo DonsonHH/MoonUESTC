@@ -2,7 +2,7 @@
 """Run on a Linux Docker host. Uses only isolated, disposable synthetic data."""
 import argparse,datetime,hashlib,http.client,json,os,pty,re,secrets,selectors,shutil,socket,subprocess,tempfile,time,urllib.request
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--image',default='ghcr.io/horoscope963852/moonuestc:0.4.1');p.add_argument('--output',required=True);a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--image',default='ghcr.io/horoscope963852/moonuestc:0.5.0');p.add_argument('--output',required=True);a=p.parse_args()
 source=Path(__file__).resolve().parents[1]
 checks=[]
 def check(name,ok):

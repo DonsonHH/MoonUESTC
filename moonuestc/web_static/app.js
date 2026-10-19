@@ -1,6 +1,6 @@
 "use strict";
 const $=id=>document.getElementById(id);
-const S={user:null,csrf:'',accounts:[],jobs:[],users:[],presets:[],view:'overview',refreshing:false,editAccount:null,confirm:null};
+const S={user:null,csrf:'',accounts:[],jobs:[],users:[],presets:[],defaultPresetId:'xuezhi_group3_amap',view:'overview',refreshing:false,editAccount:null,confirm:null};
 const modes={diagnose:'只读诊断',prepare:'位置检查',checkin:'提交打卡'};
 const reasons={need_manual_mfa:'学校要求本人完成二次验证',need_manual_captcha:'学校要求本人完成验证码',login_rejected:'学校登录未成功，请核对凭据',micro_app_unauthorized_after_login:'登录成功，但打卡应用仍未授权',daily_login_limit:'达到当日密码登录次数上限',outside_allowed_location:'配置坐标在允许范围外',outside_checkin_window:'不在学校允许的打卡时段',abnormal_record:'学校记录被标记异常',record_not_confirmed:'学校保存的记录尚未确认',another_run_active:'其他任务正在使用打卡数据',worker_interrupted:'任务在服务器重启时中断，请核对学校记录',job_expired:'任务已跨过业务日期，请重新检查',session_rejected:'学校会话失效',network_error:'网络连接失败',timeout:'请求等待超时',tls_error:'学校 HTTPS 连接失败',dns_error:'学校地址解析失败',worker_internal_error:'任务执行失败，请联系管理员',account_disabled:'账号或所属用户已停用'};
 function node(tag,cls='',value=null){const n=document.createElement(tag);if(cls)n.className=cls;if(value!==null)n.textContent=String(value);return n;}
@@ -30,9 +30,69 @@ function confirmAction(title,message,action,submission=false,danger=false){$('co
 function confirmSubmit(a){confirmAction('确认提交打卡','将使用“'+a.label+'”配置的位置向学校提交今天的打卡记录。若结果不明确，请先核对学校记录。',()=>queue(a,'checkin'),true);}
 function confirmDeleteAccount(a){confirmAction('删除打卡账号','确定删除“'+a.label+'”及其在网页中的运行记录？当天防重复提交记录仍会保留。',async()=>{await api('/api/accounts/'+a.id,{method:'DELETE'});toast('打卡账号已删除');await refresh();},false,true);}
 function confirmDeleteUser(user){confirmAction('删除用户','确定删除“'+user.display_name+'”及其所有打卡账号？',async()=>{await api('/api/users/'+user.id,{method:'DELETE'});toast('用户已删除');await refresh();},false,true);}
-function setLocationFields(){const fixed=document.querySelector('[name=location-mode]:checked').value==='fixed';$('custom-fields').hidden=!fixed;$('preset-fields').hidden=fixed;for(const id of ['location-name','longitude','latitude']){$(id).required=fixed;$(id).disabled=!fixed;}$('coordinate-system').disabled=!fixed;}
-function openAccount(a=null){S.editAccount=a;$('account-form').reset();$('edit-account-id').value=a?.id||'';$('account-dialog-title').textContent=a?'编辑打卡账号':'添加打卡账号';$('account-label').value=a?.label||'';$('student-id').value=a?.student_id||'';$('school-password').value='';$('school-password').required=!a;$('browser-fingerprint').value='';$('browser-fingerprint').required=!a;$('saved-password-hint').textContent=a?'已保存，留空保持原密码':'';$('saved-fingerprint-hint').textContent=a?'已保存，留空保持原指纹':'';$('user-agent').value=a?.user_agent||navigator.userAgent;$('account-enabled').checked=a?.enabled??true;$('account-automatic').checked=a?.automatic??false;$('account-automatic').disabled=!a?.ready_for_automation;$('run-at').value=a?.run_at||'22:00';$('automation-hint').textContent=a?.ready_for_automation?'该账号已通过首次提交验证，可开启每日自动运行。':'先完成一次经学校确认的手动提交，之后可以开启自动运行。';const owner=$('account-owner');owner.replaceChildren();for(const u of S.users.filter(u=>u.active)){const option=node('option','',u.display_name+'（'+u.username+'）');option.value=u.id;owner.append(option);}owner.value=a?.owner_id||S.user.id;const loc=a?.location||{mode:'preset',preset:'xuezhi_group3'};document.querySelector('[name=location-mode][value="'+(loc.mode==='fixed'?'fixed':'preset')+'"]').checked=true;$('location-name').value=loc.name||'';$('latitude').value=loc.latitude??'';$('longitude').value=loc.longitude??'';$('coordinate-system').value=(loc.coordinate_system||'gcj02').toLowerCase().replace(/[-_]/g,'');const preset=S.presets[0];$('location-address').value=loc.reverse_geocode??(loc.mode==='preset'?preset?.address||'':'');if(preset)$('form-preset-description').textContent='经度 '+preset.source.longitude+' · 纬度 '+preset.source.latitude+' · '+preset.address;setLocationFields();errorAt('account-error','');$('account-dialog').showModal();}
-$('account-form').addEventListener('submit',async event=>{event.preventDefault();errorAt('account-error','');$('save-account').disabled=true;try{const fixed=document.querySelector('[name=location-mode]:checked').value==='fixed';let location;if(fixed){location={mode:'fixed',name:$('location-name').value.trim(),latitude:Number($('latitude').value),longitude:Number($('longitude').value),coordinate_system:$('coordinate-system').value,reverse_geocode:$('location-address').value.trim()};}else{location={mode:'preset',preset:'xuezhi_group3'};if($('location-address').value!==(S.presets[0]?.address||''))location.reverse_geocode=$('location-address').value.trim();}if(S.editAccount?.location?.mode===location.mode&&S.editAccount.location.request_metadata)location.request_metadata=S.editAccount.location.request_metadata;const data={label:$('account-label').value.trim(),student_id:$('student-id').value.trim(),password:$('school-password').value,browser_fingerprint:$('browser-fingerprint').value.trim(),user_agent:$('user-agent').value.trim(),location,enabled:$('account-enabled').checked,automatic:$('account-automatic').checked,run_at:$('run-at').value};if(S.user.role==='admin')data.owner_id=Number($('account-owner').value);const id=$('edit-account-id').value;await api('/api/accounts'+(id?'/'+id:''),{method:id?'PATCH':'POST',body:JSON.stringify(data)});$('school-password').value='';$('browser-fingerprint').value='';$('account-dialog').close();toast('账号已保存，未提交打卡');await refresh();}catch(error){errorAt('account-error',error.message);}finally{$('save-account').disabled=false;}});
+function selectedPreset(){return S.presets.find(p=>p.id===$('location-preset').value);}
+function presetPreview(fillAddress=false){
+  const preset=selectedPreset();
+  $('form-preset-name').textContent=preset?.name||'请选择位置';
+  $('form-preset-description').textContent=preset?'经度 '+preset.source.longitude+' · 纬度 '+preset.source.latitude:'';
+  $('form-coordinate-note').textContent='高德 GCJ-02 坐标，直接提交，不再转换。';
+  if(fillAddress)$('location-address').value=preset?.address||'';
+}
+function setLocationFields(){
+  const fixed=document.querySelector('[name=location-mode]:checked').value==='fixed';
+  $('custom-fields').hidden=!fixed;$('preset-fields').hidden=fixed;
+  for(const id of ['location-name','longitude','latitude']){$(id).required=fixed;$(id).disabled=!fixed;}
+  $('coordinate-system').disabled=!fixed;$('location-preset').disabled=fixed;$('location-preset').required=!fixed;
+}
+function openAccount(a=null){
+  S.editAccount=a;$('account-form').reset();$('edit-account-id').value=a?.id||'';
+  $('account-dialog-title').textContent=a?'编辑打卡账号':'添加打卡账号';
+  $('account-label').value=a?.label||'';$('student-id').value=a?.student_id||'';
+  $('school-password').value='';$('school-password').required=!a;
+  $('browser-fingerprint').value='';$('browser-fingerprint').required=!a;
+  $('saved-password-hint').textContent=a?'已保存，留空保持原密码':'';
+  $('saved-fingerprint-hint').textContent=a?'已保存，留空保持原指纹':'';
+  $('user-agent').value=a?.user_agent||navigator.userAgent;
+  $('account-enabled').checked=a?.enabled??true;$('account-automatic').checked=a?.automatic??false;
+  $('account-automatic').disabled=!a?.ready_for_automation;$('run-at').value=a?.run_at||'22:00';
+  $('automation-hint').textContent=a?.ready_for_automation?'该账号已通过首次提交验证，可开启每日自动运行。':'先完成一次经学校确认的手动提交，之后可以开启自动运行。';
+  const owner=$('account-owner');owner.replaceChildren();
+  for(const u of S.users.filter(u=>u.active)){const option=node('option','',u.display_name+'（'+u.username+'）');option.value=u.id;owner.append(option);}
+  owner.value=a?.owner_id||S.user.id;
+  const loc=a?.location||{mode:'preset',preset:S.defaultPresetId};
+  const presetId=['学知三组团','xuezhi_group3'].includes(loc.preset)?S.defaultPresetId:loc.preset;
+  const choices=S.presets;
+  $('location-preset').replaceChildren();
+  for(const p of choices){const option=node('option','',p.name+(p.id===S.defaultPresetId?'（默认）':''));option.value=p.id;$('location-preset').append(option);}
+  $('location-preset').value=loc.mode==='preset'?presetId:S.defaultPresetId;
+  document.querySelector('[name=location-mode][value="'+(loc.mode==='fixed'?'fixed':'preset')+'"]').checked=true;
+  $('location-name').value=loc.name||'';$('latitude').value=loc.latitude??'';$('longitude').value=loc.longitude??'';
+  $('coordinate-system').value=(loc.coordinate_system||'gcj02').toLowerCase().replace(/[-_]/g,'');
+  $('location-address').value=loc.reverse_geocode??(loc.mode==='preset'?selectedPreset()?.address||'':'');
+  presetPreview();setLocationFields();errorAt('account-error','');$('account-dialog').showModal();
+}
+$('account-form').addEventListener('submit',async event=>{
+  event.preventDefault();errorAt('account-error','');$('save-account').disabled=true;
+  try{
+    const fixed=document.querySelector('[name=location-mode]:checked').value==='fixed';
+    let location;
+    if(fixed){location={mode:'fixed',name:$('location-name').value.trim(),latitude:Number($('latitude').value),longitude:Number($('longitude').value),coordinate_system:$('coordinate-system').value,reverse_geocode:$('location-address').value.trim()};}
+    else{
+      const preset=selectedPreset();if(!preset)throw new Error('请选择打卡位置。');
+      location={mode:'preset',preset:preset.id};
+      if($('location-address').value.trim()!==(preset.address||''))location.reverse_geocode=$('location-address').value.trim();
+    }
+    const previous=S.editAccount?.location;
+    const previousPreset=['学知三组团','xuezhi_group3'].includes(previous?.preset)?S.defaultPresetId:previous?.preset;
+    const samePoint=previous?.mode===location.mode&&(location.mode==='preset'?previousPreset===location.preset:previous.latitude===location.latitude&&previous.longitude===location.longitude&&previous.coordinate_system===location.coordinate_system);
+    if(samePoint&&previous.request_metadata)location.request_metadata=previous.request_metadata;
+    const data={label:$('account-label').value.trim(),student_id:$('student-id').value.trim(),password:$('school-password').value,browser_fingerprint:$('browser-fingerprint').value.trim(),user_agent:$('user-agent').value.trim(),location,enabled:$('account-enabled').checked,automatic:$('account-automatic').checked,run_at:$('run-at').value};
+    if(S.user.role==='admin')data.owner_id=Number($('account-owner').value);
+    const id=$('edit-account-id').value;
+    await api('/api/accounts'+(id?'/'+id:''),{method:id?'PATCH':'POST',body:JSON.stringify(data)});
+    $('school-password').value='';$('browser-fingerprint').value='';$('account-dialog').close();toast('账号已保存，未提交打卡');await refresh();
+  }catch(error){errorAt('account-error',error.message);}finally{$('save-account').disabled=false;}
+});
 function openUser(user=null){$('user-form').reset();$('edit-user-id').value=user?.id||'';$('user-dialog-title').textContent=user?'编辑用户':'添加用户';$('user-username').value=user?.username||'';$('user-username').disabled=Boolean(user);$('user-display-name').value=user?.display_name||'';$('user-role').value=user?.role||'user';$('user-active').checked=user?.active??true;$('user-password').value='';$('user-password').required=!user;$('user-password-hint').textContent=user?'留空保持原密码；填写新密码即执行重置。':'至少 12 个字符，首次登录后需修改。';errorAt('user-error','');$('user-dialog').showModal();}
 $('user-form').addEventListener('submit',async event=>{event.preventDefault();errorAt('user-error','');$('save-user').disabled=true;try{const id=$('edit-user-id').value;const data={display_name:$('user-display-name').value.trim(),role:$('user-role').value,active:$('user-active').checked};if(!id)data.username=$('user-username').value.trim();if($('user-password').value)data.password=$('user-password').value;await api('/api/users'+(id?'/'+id:''),{method:id?'PATCH':'POST',body:JSON.stringify(data)});$('user-password').value='';$('user-dialog').close();toast('用户已保存');await refresh();}catch(error){errorAt('user-error',error.message);}finally{$('save-user').disabled=false;}});
 $('password-form').addEventListener('submit',async event=>{event.preventDefault();errorAt('password-error','');if($('new-password').value!==$('confirm-password').value){errorAt('password-error','两次新密码不一致。');return;}const button=event.submitter;button.disabled=true;try{await api('/api/me/password',{method:'POST',body:JSON.stringify({current_password:$('current-password').value,new_password:$('new-password').value})});$('password-form').reset();location.replace('/login');}catch(error){errorAt('password-error',error.message);button.disabled=false;}});
@@ -41,8 +101,13 @@ $('submission-check').addEventListener('change',()=>$('confirm-action').disabled
 for(const b of document.querySelectorAll('.close-dialog'))b.addEventListener('click',()=>b.closest('dialog').close());
 for(const b of document.querySelectorAll('[data-view]'))b.addEventListener('click',()=>showView(b.dataset.view));
 for(const b of document.querySelectorAll('.add-account-button'))b.addEventListener('click',()=>openAccount());
-for(const radio of document.querySelectorAll('[name=location-mode]'))radio.addEventListener('change',()=>{if(radio.value==='fixed'&&$('location-address').value===S.presets[0]?.address)$('location-address').value='';if(radio.value==='preset'&&!$('location-address').value)$('location-address').value=S.presets[0]?.address||'';setLocationFields();});
+for(const radio of document.querySelectorAll('[name=location-mode]'))radio.addEventListener('change',()=>{
+  if(radio.value==='fixed'&&$('location-address').value===(selectedPreset()?.address||''))$('location-address').value='';
+  if(radio.value==='preset')presetPreview(true);
+  setLocationFields();
+});
+$('location-preset').addEventListener('change',()=>presetPreview(true));
 $('add-user').addEventListener('click',()=>openUser());$('account-search').addEventListener('input',render);$('refresh-jobs').addEventListener('click',refresh);$('show-help').addEventListener('click',()=>$('help-dialog').showModal());$('fingerprint-help').addEventListener('click',()=>$('help-dialog').showModal());
 $('logout').addEventListener('click',async()=>{try{await api('/api/logout',{method:'POST',body:'{}'});}catch{}finally{location.replace('/login');}});
 function tick(){$('clock').textContent=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',month:'long',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit'}).format(new Date());}tick();setInterval(tick,30000);
-(async()=>{try{const session=await api('/api/session');if(!session.authenticated){location.replace('/login');return;}S.user=session.user;S.csrf=session.csrf_token;$('overview-account-heading').textContent=S.user.role==='admin'?'全部打卡账号':'我的打卡账号';$('current-name').textContent=S.user.display_name;$('current-role').textContent=S.user.role==='admin'?'管理员':'普通用户';$('avatar').textContent=Array.from(S.user.display_name)[0]||'U';$('app-version').textContent='v'+session.version;$('http-notice').hidden=session.https;$('password-required').hidden=!S.user.must_change_password;for(const el of document.querySelectorAll('.admin-only'))el.hidden=S.user.role!=='admin';const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Shanghai',hour:'2-digit',hour12:false}).format(new Date()));$('greeting').textContent=(hour>=18||hour<6?'晚上好':'你好')+'，'+S.user.display_name;if(S.user.must_change_password){showView('settings');return;}const locations=await api('/api/locations');S.presets=locations.locations;$('preset-address').textContent=S.presets[0]?.address||'';await refresh();setInterval(()=>{if(document.visibilityState==='visible')refresh();},6000);}catch(error){errorAt('global-error',error.message);}})();
+(async()=>{try{const session=await api('/api/session');if(!session.authenticated){location.replace('/login');return;}S.user=session.user;S.csrf=session.csrf_token;$('overview-account-heading').textContent=S.user.role==='admin'?'全部打卡账号':'我的打卡账号';$('current-name').textContent=S.user.display_name;$('current-role').textContent=S.user.role==='admin'?'管理员':'普通用户';$('avatar').textContent=Array.from(S.user.display_name)[0]||'U';$('app-version').textContent='v'+session.version;$('http-notice').hidden=session.https;$('password-required').hidden=!S.user.must_change_password;for(const el of document.querySelectorAll('.admin-only'))el.hidden=S.user.role!=='admin';const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Shanghai',hour:'2-digit',hour12:false}).format(new Date()));$('greeting').textContent=(hour>=18||hour<6?'晚上好':'你好')+'，'+S.user.display_name;if(S.user.must_change_password){showView('settings');return;}const locations=await api('/api/locations');S.presets=locations.locations;S.defaultPresetId=locations.default_preset_id;const preset=S.presets.find(p=>p.id===S.defaultPresetId);$('default-preset-name').textContent=preset?.name||'常用位置';$('preset-address').textContent=preset?'经度 '+preset.source.longitude+' · 纬度 '+preset.source.latitude:'';await refresh();setInterval(()=>{if(document.visibilityState==='visible')refresh();},6000);}catch(error){errorAt('global-error',error.message);}})();

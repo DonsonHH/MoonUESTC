@@ -11,8 +11,9 @@ from flask import Flask,g,jsonify,redirect,request,send_from_directory
 from werkzeug.exceptions import HTTPException
 
 from . import __version__
+from .captcha import RegistrationCaptcha
 from .errors import ToolError
-from .locations import list_presets
+from .locations import DEFAULT_PRESET_ID,list_presets
 from .web_errors import WebError
 from .web_service import WebWorker
 from .web_store import WebStore
@@ -39,7 +40,7 @@ def normalize_origin(value,allow_http=False):
         raise ToolError('dashboard_origin_required','web_config') from None
 
 
-def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner=None,hasher=None):
+def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner=None,hasher=None,registration_enabled=None):
     origin=normalize_origin(public_url,allow_http)
     secure=origin.startswith('https://')
     os.umask(0o077)
@@ -51,9 +52,12 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
     app.json.ensure_ascii=False
     store=WebStore(directory,hasher)
     worker=WebWorker(store,runner)
+    registration_captcha=RegistrationCaptcha(store)
     app.extensions['moon_store']=store
     app.extensions['moon_worker']=worker
+    app.extensions['moon_captcha']=registration_captcha
     app.config['MOON_ORIGIN']=origin
+    app.config['MOON_REGISTRATION_ENABLED']=(os.environ.get('MOON_ALLOW_REGISTRATION','1')=='1' if registration_enabled is None else bool(registration_enabled))
 
     def response_ok(value=None,status=200):
         return jsonify({'ok':True,**(value or {})}),status
@@ -112,7 +116,7 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
         response.headers['X-Frame-Options']='DENY'
         response.headers['Referrer-Policy']='same-origin'
         response.headers['Permissions-Policy']='geolocation=(), camera=(), microphone=()'
-        response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+        response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
         if secure: response.headers['Strict-Transport-Security']='max-age=31536000'
         return response
 
@@ -120,7 +124,7 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
     def web_error(error):
         response=jsonify({'ok':False,'error':{'code':error.code,'message':error.message}})
         response.status_code=error.status
-        if error.status==429: response.headers['Retry-After']='20' if error.code!='login_rate_limited' else '900'
+        if error.status==429: response.headers['Retry-After']='900' if error.code in ('login_rate_limited','registration_rate_limited','captcha_rate_limited') else '20'
         return response
 
     @app.errorhandler(ToolError)
@@ -153,9 +157,36 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
     def session_info():
         identity=current()
         if not identity:
-            return response_ok({'authenticated':False,'initialized':store.initialized(),'https':secure,'version':__version__})
+            return response_ok({'authenticated':False,'initialized':store.initialized(),'https':secure,'version':__version__,'registration_enabled':app.config['MOON_REGISTRATION_ENABLED'] and store.initialized()})
         user,csrf=identity
-        return response_ok({'authenticated':True,'user':user,'csrf_token':csrf,'https':secure,'version':__version__})
+        return response_ok({'authenticated':True,'user':user,'csrf_token':csrf,'https':secure,'version':__version__,'registration_enabled':app.config['MOON_REGISTRATION_ENABLED'] and store.initialized()})
+
+    @app.get('/register')
+    def register_page():
+        if current(): return redirect('/')
+        if not app.config['MOON_REGISTRATION_ENABLED']:
+            raise WebError(403,'registration_disabled','管理员已关闭自助注册。')
+        if not store.initialized():
+            raise WebError(503,'not_initialized','管理员尚未初始化，请联系管理员。')
+        return send_from_directory(pages,'register.html')
+
+    @app.post('/api/register')
+    def register():
+        if not app.config['MOON_REGISTRATION_ENABLED']:
+            raise WebError(403,'registration_disabled','管理员已关闭自助注册。')
+        value=body()
+        if set(value)-{'username','password','altcha'}:
+            raise WebError(400,'invalid_fields','注册只接受用户名、密码和验证信息。')
+        proof=value.pop('altcha',None)
+        registration_captcha.consume(proof,request.remote_addr or 'unknown')
+        user=store.register_user(value,request.remote_addr or 'unknown')
+        return response_ok({'user':user},201)
+
+    @app.get('/api/registration/challenge')
+    def registration_challenge():
+        if not app.config['MOON_REGISTRATION_ENABLED']:
+            raise WebError(403,'registration_disabled','管理员已关闭自助注册。')
+        return jsonify(registration_captcha.issue(request.remote_addr or 'unknown'))
 
     @app.post('/api/login')
     def login():
@@ -187,7 +218,7 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
 
     @app.get('/api/locations')
     @protected()
-    def locations(): return response_ok({'locations':list_presets()})
+    def locations(): return response_ok({'locations':list_presets(),'default_preset_id':DEFAULT_PRESET_ID})
 
     @app.get('/api/accounts')
     @protected()

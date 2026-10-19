@@ -53,9 +53,10 @@ class DashboardIdentity(WebCase):
             self.assertEqual(response.status_code,403,response.get_json())
             self.assertEqual(response.get_json()['error']['code'],'csrf_failed')
 
-    def test_users_have_no_public_registration_and_no_default_password(self):
+    def test_public_registration_can_be_disabled_and_no_default_password(self):
         client=self.app.test_client()
-        self.assertEqual(client.post('/api/register',base_url=ORIGIN,headers={'Origin':ORIGIN},json={}).status_code,404)
+        self.app.config['MOON_REGISTRATION_ENABLED']=False
+        self.assertEqual(client.post('/api/register',base_url=ORIGIN,headers={'Origin':ORIGIN},json={}).status_code,403)
         with self.assertRaises(WebError):
             self.store.create_user(None,{'username':'newadmin','password':ADMIN_PASS,'role':'admin'},bootstrap=True)
         response=client.post('/api/login',base_url=ORIGIN,headers={'Origin':ORIGIN},json={'username':'admin','password':'admin'})

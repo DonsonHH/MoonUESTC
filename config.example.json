@@ -13,7 +13,7 @@
       "user_agent": "PUT_THE_USER_AGENT_FROM_YOUR_TRUSTED_BROWSER_HERE",
       "location": {
         "mode": "preset",
-        "preset": "xuezhi_group3"
+        "preset": "xuezhi_group3_amap"
       }
     }
   ]

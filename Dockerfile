@@ -16,7 +16,7 @@ RUN python -m unittest discover -s tests -v \
     && chown 10001:10001 /data /config
 ARG VCS_REF=unreleased
 LABEL org.opencontainers.image.title="MoonUESTC" \
-      org.opencontainers.image.version="0.4.1" \
+      org.opencontainers.image.version="0.5.0" \
       org.opencontainers.image.source="https://github.com/horoscope963852/MoonUESTC" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.licenses="MIT"

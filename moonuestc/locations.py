@@ -3,16 +3,49 @@ import copy
 from .coordinates import finite_number, normalize_coordinate_system, to_gcj02
 from .errors import ToolError
 
-DEFAULT_PRESET_ID = "xuezhi_group3"
+# AMap coordinates supplied for the 2026-10-19 common-location list are GCJ-02.
+# Earlier group-three IDs resolve to the current AMap point.
+DEFAULT_PRESET_ID = "xuezhi_group3_amap"
+AMAP_POINTS = (
+    (1, 103.932037, 30.754670),
+    (2, 103.932328, 30.753780),
+    (3, 103.933849, 30.754874),
+    (4, 103.934154, 30.753768),
+    (5, 103.935437, 30.753607),
+    (6, 103.931652, 30.755699),
+    (7, 103.932501, 30.756534),
+    (8, 103.932875, 30.755637),
+)
+GROUP_NAMES = ("一", "二", "三", "四", "五", "六", "七", "八")
 PRESETS = {
-    DEFAULT_PRESET_ID: {
-        "name": "学知三组团", "latitude": 30.757413, "longitude": 103.930739,
-        "coordinate_system": "wgs84",
-        "reverse_geocode": "中国四川省成都市郫都区合作街道银杏大道",
-        # Screenshot accuracy; retained as static historical metadata, not a new measurement.
-        "request_metadata": {"accuracy": 40},
-    },
+    f"xuezhi_group{group}_amap": {
+        "name": "学知" + GROUP_NAMES[group - 1] + "组团",
+        "longitude": longitude, "latitude": latitude,
+        "coordinate_system": "gcj02", "reverse_geocode": "",
+    }
+    for group, longitude, latitude in AMAP_POINTS
 }
+PRESET_ALIASES = {"xuezhi_group3": DEFAULT_PRESET_ID, "学知三组团": DEFAULT_PRESET_ID}
+OLD_GROUP3_ADDRESS = "中国四川省成都市郫都区合作街道银杏大道"
+
+
+def upgrade_group3_location(raw, *, migrate_named=False):
+    """Copy and normalize prior group-three references without touching credentials."""
+    result = copy.deepcopy(raw)
+    if not isinstance(result, dict):
+        return result
+    preset = result.get("mode") == "preset" and result.get("preset") in PRESET_ALIASES
+    named = migrate_named and result.get("mode") == "fixed" and result.get("name") in ("学知三组团", "学知三组团（旧版位置）")
+    if preset:
+        result["preset"] = DEFAULT_PRESET_ID
+    elif named:
+        point = PRESETS[DEFAULT_PRESET_ID]
+        result.update(name="学知三组团", latitude=point["latitude"], longitude=point["longitude"], coordinate_system="gcj02")
+    if (preset or named) and result.get("reverse_geocode") == OLD_GROUP3_ADDRESS:
+        result.pop("reverse_geocode")
+    return result
+
+
 FIXED_LOCATION_KEYS = {"mode", "name", "latitude", "longitude", "reverse_geocode",
                        "coordinate_system", "request_metadata"}
 PRESET_LOCATION_KEYS = {"mode", "preset", "reverse_geocode", "request_metadata"}
@@ -27,6 +60,7 @@ def _name(value):
 def get_preset(value):
     if not isinstance(value, str):
         raise ToolError("unknown_location_preset", "location")
+    value = PRESET_ALIASES.get(value, value)
     for key, preset in PRESETS.items():
         if value in (key, preset["name"]):
             return key, copy.deepcopy(preset)
@@ -41,6 +75,7 @@ def resolve_location(account):
         raise ToolError("ambiguous_location_configuration", "location")
     if not isinstance(raw, dict):
         raise ToolError("invalid_fixed_location_configuration", "location")
+    raw = upgrade_group3_location(raw)
     mode = raw.get("mode")
     if mode == "fixed":
         if not set(raw) <= FIXED_LOCATION_KEYS:

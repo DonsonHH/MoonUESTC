@@ -32,7 +32,7 @@ compose_help="$(docker compose up --help)"
 [[ "$compose_help" == *--wait* ]] || fail '当前 Compose 不支持 --wait，请更新 Compose v2。'
 if [[ ! -f .env ]]; then
   (( ASSUME_YES == 0 )) || fail '非交互安装需要现成的 .env，请参考 .env.example。'
-  printf 'MoonUESTC v0.4.1 首次配置\n公网访问请使用已有 HTTPS 反向代理；局域网可使用私有 IP 的 HTTP。\n'
+  printf 'MoonUESTC v0.5.0 首次配置\n公网访问请使用已有 HTTPS 反向代理；局域网可使用私有 IP 的 HTTP。\n'
   read -r -p '主机后端端口 [8088]：' port
   port="${port:-8088}"
   [[ "$port" =~ ^[0-9]+$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 )) || fail '端口应为 1–65535。'
@@ -47,7 +47,7 @@ if [[ ! -f .env ]]; then
   if (( EUID == 0 )); then uid=10001; gid=10001; else uid="$(id -u)"; gid="$(id -g)"; fi
   (
     set -o noclobber
-    printf 'MOON_IMAGE=ghcr.io/horoscope963852/moonuestc:0.4.1\nPUID=%s\nPGID=%s\nMOON_PORT=%s\nMOON_BIND_ADDRESS=%s\nMOON_PUBLIC_URL=%s\nMOON_ALLOW_INSECURE_HTTP=%s\nMOON_DATA_DIR=./data\nMOON_CONFIG_DIR=./config\nCOMPOSE_PROJECT_NAME=moonuestc\n' "$uid" "$gid" "$port" "$bind_address" "$public_url" "$allow_http" > .env
+    printf 'MOON_IMAGE=ghcr.io/horoscope963852/moonuestc:0.5.0\nPUID=%s\nPGID=%s\nMOON_PORT=%s\nMOON_BIND_ADDRESS=%s\nMOON_PUBLIC_URL=%s\nMOON_ALLOW_INSECURE_HTTP=%s\nMOON_DATA_DIR=./data\nMOON_CONFIG_DIR=./config\nCOMPOSE_PROJECT_NAME=moonuestc\n' "$uid" "$gid" "$port" "$bind_address" "$public_url" "$allow_http" > .env
   ) || fail '.env 已存在，未覆盖。'
   chmod 600 .env
 fi

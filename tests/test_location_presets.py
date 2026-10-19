@@ -64,15 +64,33 @@ class Coordinates(unittest.TestCase):
 
 
 class NamedLocations(unittest.TestCase):
-    def test_preset_preserves_source_coordinates_name_and_screenshot_accuracy(self):
-        key, preset = get_preset(DEFAULT_PRESET_ID)
-        self.assertEqual(key, DEFAULT_PRESET_ID)
-        self.assertEqual(preset["name"], "学知三组团")
-        self.assertEqual(preset["latitude"], 30.757413)
-        self.assertEqual(preset["longitude"], 103.930739)
-        self.assertEqual(preset["coordinate_system"], "wgs84")
-        self.assertEqual(preset["request_metadata"]["accuracy"], 40)
-        self.assertEqual(preset["reverse_geocode"], "中国四川省成都市郫都区合作街道银杏大道")
+    def test_all_eight_amap_presets_match_user_coordinates_without_conversion(self):
+        points=[(103.932037,30.754670),(103.932328,30.753780),(103.933849,30.754874),
+                (103.934154,30.753768),(103.935437,30.753607),(103.931652,30.755699),
+                (103.932501,30.756534),(103.932875,30.755637)]
+        presets=list_presets()
+        self.assertEqual(len(presets),8)
+        self.assertEqual(DEFAULT_PRESET_ID,'xuezhi_group3_amap')
+        for i,(preset,(lng,lat)) in enumerate(zip(presets,points),1):
+            with self.subTest(group=i):
+                self.assertEqual(preset['id'],f'xuezhi_group{i}_amap')
+                self.assertEqual(preset['source'],{'latitude':lat,'longitude':lng,'coordinateSystem':'gcj02'})
+                self.assertEqual(preset['submittedCoordinates'],preset['source'])
+                self.assertEqual(preset['coordinateConversion'],'none')
+                self.assertEqual(preset['address'],'')
+                payload=build_payload(preset_account(preset=preset['id']),fixtures.INSTANT)
+                self.assertEqual((payload['longitude'],payload['latitude']),(lng,lat))
+
+    def test_old_group_three_id_and_name_use_the_new_amap_point(self):
+        for value in ('xuezhi_group3','学知三组团'):
+            key,preset=get_preset(value)
+            self.assertEqual(key,DEFAULT_PRESET_ID)
+            self.assertEqual(preset['name'],'学知三组团')
+            self.assertEqual(preset['latitude'],30.754874)
+            self.assertEqual(preset['longitude'],103.933849)
+            self.assertEqual(preset['coordinate_system'],'gcj02')
+            self.assertEqual(preset['reverse_geocode'],'')
+        self.assertEqual(len(list_presets()),8)
 
     def test_new_configuration_template_defaults_to_the_requested_preset(self):
         path = Path(__file__).resolve().parents[1] / "config.example.json"
@@ -83,18 +101,18 @@ class NamedLocations(unittest.TestCase):
         validate_config({"version":1,"accounts":[account]})
         self.assertTrue(location_configured(account))
 
-    def test_chinese_display_name_can_select_the_preset(self):
+    def test_chinese_display_name_can_select_the_new_preset(self):
         payload = build_payload(preset_account(preset="学知三组团"), fixtures.INSTANT)
-        self.assertAlmostEqual(payload["latitude"], EXPECTED_LAT, places=10)
-        self.assertAlmostEqual(payload["longitude"], EXPECTED_LNG, places=10)
+        self.assertEqual(payload["latitude"],30.754874)
+        self.assertEqual(payload["longitude"],103.933849)
 
     def test_resolution_cannot_mutate_global_defaults(self):
         first = resolve_location(preset_account())
         first["latitude"] = 0
         first["request_metadata"]["accuracy"] = 999
         second = resolve_location(preset_account())
-        self.assertEqual(second["latitude"], 30.757413)
-        self.assertEqual(second["request_metadata"]["accuracy"], 40)
+        self.assertEqual(second["latitude"], 30.754874)
+        self.assertNotIn("accuracy",second["request_metadata"])
 
     def test_unknown_preset_never_falls_back(self):
         with self.assertRaises(ToolError) as caught:
@@ -137,7 +155,7 @@ class NamedLocations(unittest.TestCase):
         payload = build_payload(account,fixtures.INSTANT)
         self.assertEqual(payload["reverseGeocode"],"手填地址")
         self.assertEqual(payload["accuracy"],55)
-        self.assertEqual(get_preset(DEFAULT_PRESET_ID)[1]["request_metadata"]["accuracy"],40)
+        self.assertNotIn("request_metadata",get_preset(DEFAULT_PRESET_ID)[1])
 
     def test_legacy_gcj_payload_is_still_used_verbatim(self):
         payload = build_payload(fixtures.ACCOUNT,fixtures.INSTANT)
@@ -172,24 +190,25 @@ class PresetFlows(unittest.TestCase):
                            clock=lambda:fixtures.INSTANT,sleep=lambda _:None,
                            transport_factory=lambda *args:self.transport)
 
-    def test_preset_sends_converted_coordinates_and_keeps_static_address(self):
+    def test_preset_sends_amap_coordinates_and_resolves_address_for_them(self):
         out=self.run_mode()
         self.assertEqual(out["result"],"confirmed")
         payload=self.transport.last_payload
-        self.assertAlmostEqual(payload["latitude"],EXPECTED_LAT,places=10)
-        self.assertAlmostEqual(payload["longitude"],EXPECTED_LNG,places=10)
+        self.assertEqual(payload["latitude"],30.754874)
+        self.assertEqual(payload["longitude"],103.933849)
         self.assertEqual(payload["coordinateSystemCode"],"gcj02")
-        self.assertEqual(payload["accuracy"],40)
-        self.assertEqual(self.transport.reverse_queries,[])
+        self.assertEqual(payload["accuracy"],86)
+        self.assertEqual(self.transport.reverse_queries,[{"lat":["30.754874"],"lng":["103.933849"]}])
+        self.assertEqual(payload["reverseGeocode"],self.transport.address_data)
         self.assertNotIn("preset",payload)
         self.assertEqual(self.transport.post_count,1)
 
-    def test_prepare_displays_name_and_approximate_conversion_without_post(self):
+    def test_prepare_displays_name_and_no_conversion_without_post(self):
         out=self.run_mode("prepare")
         self.assertEqual(out["result"],"dry_run_ready")
         self.assertEqual(out["locationSource"],"preset")
         self.assertEqual(out["locationName"],"学知三组团")
-        self.assertEqual(out["coordinateConversion"],"wgs84_to_gcj02_approx")
+        self.assertEqual(out["coordinateConversion"],"none")
         self.assertEqual(self.transport.post_count,0)
 
     def test_diagnose_names_the_selected_preset(self):
@@ -197,7 +216,7 @@ class PresetFlows(unittest.TestCase):
         self.assertEqual(out["result"],"auth_ready")
         self.assertTrue(out["locationConfigured"])
         self.assertEqual(out["presetId"],DEFAULT_PRESET_ID)
-        self.assertEqual(out["inputCoordinateSystem"],"wgs84")
+        self.assertEqual(out["inputCoordinateSystem"],"gcj02")
         self.assertEqual(out["outputCoordinateSystem"],"gcj02")
 
     def test_custom_named_location_remains_available_next_to_preset(self):
@@ -216,8 +235,9 @@ class PresetFlows(unittest.TestCase):
             self.assertEqual(main(["locations","--config","missing-config.json"]),0)
         out=json.loads(stream.getvalue())
         self.assertEqual(out["schoolRequests"],0)
-        self.assertEqual(out["locations"][0]["name"],"学知三组团")
-        self.assertEqual(out["locations"][0]["source"]["longitude"],103.930739)
+        self.assertEqual(len(out["locations"]),8)
+        self.assertEqual(out["locations"][0]["name"],"学知一组团")
+        self.assertEqual(out["locations"][0]["source"]["longitude"],103.932037)
 
 
 if __name__ == "__main__":
