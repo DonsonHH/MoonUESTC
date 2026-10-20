@@ -1,6 +1,6 @@
 {
   "version": "0.5.1",
-  "scope": "local repair and maintained service; public release remains v0.5.0",
+  "scope": "v0.5.1 official release; runtime matches the validated diagnostics repair",
   "unit_tests": 169,
   "unit_test_network": "none",
   "browser_checks": {
@@ -70,5 +70,6 @@
     "tests/test_location_presets.py": "df53759a02988ab5fa242e80f5045d00d2fb4da1294b6aba8e758da8bbff13fa",
     "tests/test_submission_diagnostics.py": "0b95679968251f4357f1f3aeca8935ffce45407b82c9b72973d7e7a93ef3b20c",
     "tests/test_workflows.py": "582731a13c63325924bbf607bdc053c9cf5ab2e00c95e21bd3ea060a4d2897d2"
-  }
+  },
+  "validated_runtime_commit": "fd58f172898409e15c345fe32d8aae792a3adeef"
 }

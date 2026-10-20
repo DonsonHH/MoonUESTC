@@ -1,6 +1,6 @@
 services:
   moonuestc:
-    image: "${MOON_IMAGE:-ghcr.io/horoscope963852/moonuestc:0.5.0}"
+    image: "${MOON_IMAGE:-ghcr.io/horoscope963852/moonuestc:0.5.1}"
     user: "${PUID:-10001}:${PGID:-10001}"
     command: ["serve"]
     restart: unless-stopped

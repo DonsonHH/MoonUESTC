@@ -22,6 +22,6 @@ clean=(root/'third_party/UESTC-MoonCheck.LICENSE').read_text(encoding='utf-8')
 expected='\n'.join(line for line in raw.splitlines() if not line.startswith(('<<<<<<<','=======','>>>>>>>')))+'\n'
 if clean!=expected:problems.append({'file':'third_party/UESTC-MoonCheck.LICENSE','reason':'unexpected_license_change'})
 for name in ['README.md','Dockerfile','compose.yaml','install.sh','moonuestc/__init__.py']:
-    if '0.5.0' not in (root/name).read_text(encoding='utf-8'):problems.append({'file':name,'reason':'release_version_missing'})
+    if '0.5.1' not in (root/name).read_text(encoding='utf-8'):problems.append({'file':name,'reason':'release_version_missing'})
 print(json.dumps({'passed':not problems,'files_checked':count,'problems':problems},ensure_ascii=False))
 sys.exit(bool(problems))

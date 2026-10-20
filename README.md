@@ -1,8 +1,8 @@
 # MoonUESTC · 晚安成电自动打卡系统
 
-本工作分支包含 **v0.5.1 日志修复**：持久化学校错误码和脱敏信息，并区分首次提交与仅复查，见 [诊断说明](docs/run-diagnostics.md)。公开发行镜像仍为 v0.5.0；本分支修复通过独立构建镜像部署。
+**v0.5.1** 持久化学校错误码和脱敏信息，并在运行记录中区分首次提交与仅复查，见 [诊断说明](docs/run-diagnostics.md)。
 
-带管理员 / 普通用户登录的自托管 dashboard，适用于飞牛 NAS 和 Linux VPS。当前版本 **v0.5.0**，提供 `linux/amd64` 镜像。
+带管理员 / 普通用户登录的自托管 dashboard，适用于飞牛 NAS 和 Linux VPS。当前版本 **v0.5.1**，提供 `linux/amd64` 镜像。
 
 - 管理员管理所有用户及学校账号；普通用户只管理自己的账号。
 - 每个账号选择学知一至八组团的常用位置，默认“学知三组团”，或手动填写、命名位置，支持 GCJ-02 / WGS-84。
@@ -41,7 +41,7 @@ docker compose run --rm moonuestc init-admin
 docker compose up -d --wait
 ```
 
-默认镜像：`ghcr.io/horoscope963852/moonuestc:0.5.0`。升级前先备份数据，再选择固定版本，无需依赖 latest。
+默认镜像：`ghcr.io/horoscope963852/moonuestc:0.5.1`。升级前先备份数据，再选择固定版本，无需依赖 latest。
 
 ## 获取可信浏览器指纹
 
