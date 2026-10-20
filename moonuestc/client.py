@@ -7,6 +7,7 @@ import urllib.parse
 from html.parser import HTMLParser
 
 from .errors import AuthRequired, ToolError
+from .diagnostics import school_message
 
 ORIGIN = "https://jzsz.uestc.edu.cn"
 CAS = "https://idas.uestc.edu.cn/authserver"
@@ -57,23 +58,38 @@ def encrypt_password(password, salt):
 class School:
     def __init__(self, transport, account, budget, emit=lambda *args: None):
         self.transport, self.account, self.budget, self.emit = transport, account, budget, emit
+        self.submission_response = None
 
     def api(self, path, *, stage, payload=None):
         r = self.transport.request("POST" if payload is not None else "GET",
                                    ORIGIN + "/daily-checkin/api" + path,
                                    headers=HEADERS, payload=payload, stage=stage)
+        # Parse only JSON metadata; never keep raw bodies, HTML or response headers.
+        try:data = r.json(stage)
+        except ToolError:data = None
+        code = data.get("code") if isinstance(data,dict) and type(data.get("code")) is int else None
+        message = None
+        if isinstance(data,dict):
+            message = school_message(data.get("msg") or data.get("message"),self.account)
+        if stage == "checkin_post":
+            self.submission_response = {"httpStatus":r.status}
+            if code is not None:self.submission_response["apiCode"]=code
+            if message:self.submission_response["schoolMessage"]=message
+        def failure(kind,reason):
+            return kind(reason,stage,code,http_status=r.status,school_message=message)
         if r.status in (301, 302, 303, 401, 403):
-            raise AuthRequired("session_rejected", stage)
+            raise failure(AuthRequired,"session_rejected")
         if r.status != 200:
-            raise ToolError("http_error", stage, r.status)
-        data = r.json(stage)
+            raise failure(ToolError,"http_error")
+        if data is None:
+            raise failure(ToolError,"invalid_json")
         if not isinstance(data, dict) or type(data.get("code")) is not int:
-            raise ToolError("api_contract_changed", stage)
-        if data["code"] == 5000 or (data["code"] == 4001 and re.search(
+            raise failure(ToolError,"api_contract_changed")
+        if code == 5000 or (code == 4001 and re.search(
                 r"登录|会话|未认证", str(data.get("msg", "")))):
-            raise AuthRequired("session_rejected", stage, data["code"])
-        if data["code"] != 0 or data.get("ok") is False:
-            raise ToolError("business_error", stage, data["code"])
+            raise failure(AuthRequired,"session_rejected")
+        if code != 0 or data.get("ok") is False:
+            raise failure(ToolError,"business_error")
         return data.get("data")
 
     def today(self):
@@ -108,7 +124,7 @@ class School:
         if r.status in (301, 302, 303, 401, 403):
             raise AuthRequired("portal_session_rejected", "portal_warmup")
         if r.status != 200:
-            raise ToolError("portal_warmup_failed", "portal_warmup", r.status)
+            raise ToolError("portal_warmup_failed", "portal_warmup", http_status=r.status)
         self.emit("stage_ok", stage="portal_warmup")
         r = self.transport.follow(ENTRY, stage="micro_app_entry", headers={"Referer": ORIGIN + "/"})
         u = urllib.parse.urlsplit(r.url)
@@ -132,11 +148,11 @@ class School:
         self.transport.fingerprint(self.account["browser_fingerprint"])
         r = self.transport.request("GET", ORIGIN + "/", stage="platform_previsit")
         if r.status not in (200, 301, 302, 303):
-            raise ToolError("platform_previsit_failed", "platform_previsit", r.status)
+            raise ToolError("platform_previsit_failed", "platform_previsit", http_status=r.status)
         r = self.transport.request("GET", LOGIN, stage="cas_page",
                                    headers={"Accept": "text/html,application/xhtml+xml"})
         if r.status != 200:
-            raise ToolError("login_page_http_error", "cas_page", r.status)
+            raise ToolError("login_page_http_error", "cas_page", http_status=r.status)
         fields = login_fields(r.text)
         self.emit("stage_ok", stage="cas_page")
         self.budget()
@@ -163,4 +179,4 @@ class School:
             raise ToolError("need_manual_mfa", "cas_submit")
         if re.search(r"验证码错误|请输入验证码|滑块验证|安全验证", r.text):
             raise ToolError("need_manual_captcha", "cas_submit")
-        raise ToolError("login_rejected", "cas_submit", r.status)
+        raise ToolError("login_rejected", "cas_submit", http_status=r.status)

@@ -3,6 +3,7 @@ import contextlib
 import copy
 import hashlib
 import json
+import logging
 import re
 import secrets
 import sqlite3
@@ -14,6 +15,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError,InvalidHashError
 
 from .errors import ToolError
+from .diagnostics import ACTIONS,error_details,school_message,submission_details,verification_details
 from .locations import DEFAULT_PRESET_ID,location_details,upgrade_group3_location
 from .policy import build_payload,clock_minutes,now,validate_config
 from .runner import account_key,cookie_path
@@ -79,6 +81,7 @@ class WebStore:
                 CREATE TABLE IF NOT EXISTS web_cookies(binding TEXT PRIMARY KEY,payload BLOB NOT NULL);
                 CREATE TABLE IF NOT EXISTS web_audit(id INTEGER PRIMARY KEY,actor_id INTEGER,event TEXT,target TEXT,created_at REAL);
                 CREATE TABLE IF NOT EXISTS web_migrations(name TEXT PRIMARY KEY,applied_at REAL NOT NULL);
+                CREATE TABLE IF NOT EXISTS web_job_diagnostics(job_id TEXT PRIMARY KEY REFERENCES web_jobs(id) ON DELETE CASCADE,payload TEXT NOT NULL,updated_at REAL NOT NULL);
             ''')
         self._upgrade_group3_accounts()
 
@@ -432,7 +435,7 @@ class WebStore:
         return jid
 
     def jobs(self,actor,job_id=None):
-        sql='SELECT j.*,a.label,a.owner_id,u.display_name AS owner_name FROM web_jobs j JOIN web_accounts a ON a.id=j.account_id JOIN web_users u ON u.id=a.owner_id'
+        sql='SELECT j.*,a.label,a.owner_id,u.display_name AS owner_name,d.payload AS diagnostic_payload FROM web_jobs j JOIN web_accounts a ON a.id=j.account_id JOIN web_users u ON u.id=a.owner_id LEFT JOIN web_job_diagnostics d ON d.job_id=j.id'
         where=[]; params=[]
         if actor['role']!='admin': where.append('a.owner_id=?'); params.append(actor['id'])
         if job_id: where.append('j.id=?'); params.append(job_id)
@@ -441,9 +444,33 @@ class WebStore:
         result=[]
         for r in rows:
             result.append({key:r[key] for key in ('id','account_id','label','owner_name','mode','source','business_date','state','created_at','started_at','finished_at')} |
-                          {'result':json.loads(r['result']) if r['result'] else None})
+                          {'result':json.loads(r['result']) if r['result'] else None,'diagnostics':json.loads(r['diagnostic_payload']) if r['diagnostic_payload'] else None})
         if job_id and not result: raise WebError(404,'not_found','任务不存在。')
         return result[0] if job_id else result
+
+    def record_job_event(self,job,event,values,account=None):
+        if event not in ('run_started','submission_action','submission_result','verification','run_error'):return
+        with self.db(True) as db:
+            row=db.execute('SELECT payload FROM web_job_diagnostics WHERE job_id=?',(job['id'],)).fetchone()
+            value=json.loads(row['payload']) if row else {'action':'not_submitted','submission':None,'verification':[]}
+            if event=='submission_action':
+                action=values.get('action')
+                if isinstance(action,str) and action in ACTIONS:value['action']=action
+                value['submission']=submission_details(values.get('submission'),account)
+                if type(values.get('priorAttempt')) is bool:value['priorAttempt']=values['priorAttempt']
+            elif event=='submission_result':value['submission']=submission_details(values.get('submission'),account)
+            elif event=='verification':
+                observation=verification_details(values.get('observation'),account)
+                if observation:value['verification']=(value.get('verification',[])+[observation])[-4:]
+            elif event=='run_error':
+                error=values.get('error')
+                if isinstance(error,ToolError):value['error']=error_details(error,account)
+            db.execute('INSERT INTO web_job_diagnostics VALUES(?,?,?) ON CONFLICT(job_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at',
+                       (job['id'],json.dumps(value,ensure_ascii=False,allow_nan=False),time.time()))
+        if (event=='submission_result' and (value.get('submission') or {}).get('outcome')!='accepted') or event=='run_error':
+            safe={'jobId':job['id'],'event':event,'action':value['action']}
+            safe['submission' if event=='submission_result' else 'error']=value.get('submission' if event=='submission_result' else 'error')
+            logging.getLogger('moonuestc.diagnostics').warning('School diagnostic %s',json.dumps(safe,ensure_ascii=False,allow_nan=False))
 
     def claim_job(self):
         with self.db(True) as db:
@@ -460,8 +487,14 @@ class WebStore:
         return self._payload(row)
 
     def finish_job(self,job,result):
-        safe_keys={'result','reason','stage','apiCode','businessDate','status','abnormalFlag','checkinWindow','locationConfigured','payloadConfigured','locationSource','locationName','presetId','inputCoordinateSystem','outputCoordinateSystem','coordinateConversion'}
+        safe_keys={'result','reason','stage','apiCode','businessDate','status','abnormalFlag','checkinWindow','locationConfigured','payloadConfigured','locationSource','locationName','presetId','inputCoordinateSystem','outputCoordinateSystem','coordinateConversion','httpStatus','schoolMessage','submissionAction','priorAttempt','submission','verification'}
         result={k:v for k,v in result.items() if k in safe_keys}
+        with self.db() as db:account=db.execute('SELECT a.* FROM web_accounts a JOIN web_jobs j ON j.account_id=a.id WHERE j.id=?',(job['id'],)).fetchone()
+        context=self._payload(account) if account else None
+        if 'submissionAction' in result and (not isinstance(result['submissionAction'],str) or result['submissionAction'] not in ACTIONS):result.pop('submissionAction')
+        if 'submission' in result:result['submission']=submission_details(result['submission'],context)
+        if 'verification' in result:result['verification']=[x for v in result['verification'][-4:] if (x:=verification_details(v,context))]
+        if 'schoolMessage' in result:result['schoolMessage']=school_message(result['schoolMessage'],context)
         status='done' if result.get('result') in {'confirmed','already_recorded','auth_ready','dry_run_ready'} else 'failed'
         encoded=json.dumps(result,ensure_ascii=False,allow_nan=False)
         with self.db(True) as db:

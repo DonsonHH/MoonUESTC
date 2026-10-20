@@ -1,11 +1,13 @@
 """Single-account flow; an uncertain check-in POST is never resent."""
 import hashlib
 import time
+import uuid
 from pathlib import Path
 
 from .client import School
 from .locations import location_details
 from .errors import ToolError
+from .diagnostics import error_details,submission_details,verification_details
 from .policy import TERMINAL, build_payload, check_fence, location_configured, location_source, now, valid_today, verified, window
 from .transport import Transport
 
@@ -20,7 +22,7 @@ def cookie_path(directory, account):
     return Path(directory) / "cookies" / (name + ".lwp")
 
 
-def reconcile(school, state, key, day, clock, sleep):
+def reconcile(school, state, key, day, clock, sleep, *, emit=lambda *args,**kwargs:None, observations=None):
     last_reason = "record_not_confirmed"
     for attempt in range(3):
         if attempt:
@@ -30,13 +32,20 @@ def reconcile(school, state, key, day, clock, sleep):
             if instant.date().isoformat() != day:
                 raise ToolError("business_date_changed", "verification")
             data = school.today()
+            status = valid_today(data,instant)
+            observation=verification_details({'attempt':attempt+1,'at':instant.timestamp(),'status':data.get('recordStatusCode') if isinstance(data,dict) else None})
+            if observation:
+                if observations is not None:observations.append(observation)
+                emit('verification',observation=observation)
             if verified(data, instant):
                 state.outcome(key, day, "confirmed")
                 return {"result": "confirmed", "businessDate": day, "status": "CHECKED_IN", "abnormalFlag": False}
-            status = valid_today(data, instant)
             if status in TERMINAL:
                 return {"result": "record_changed", "businessDate": day, "status": status}
         except ToolError as error:
+            observation=verification_details({'attempt':attempt+1,'at':clock().timestamp(),**error_details(error,school.account)},school.account)
+            if observations is not None:observations.append(observation)
+            emit('verification',observation=observation)
             last_reason = error.reason
             if error.reason in ("abnormal_record", "business_date_mismatch", "business_date_changed"):
                 break
@@ -45,11 +54,35 @@ def reconcile(school, state, key, day, clock, sleep):
 
 
 def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
-                emit=lambda *args, **kwargs: None, transport_factory=Transport):
+                emit=lambda *args, **kwargs: None, transport_factory=Transport, run_id=None):
     key = account_key(account)
     transport = transport_factory(account["user_agent"], cookie_path(directory, account))
     school = School(transport, account,
                     budget=lambda: state.login_budget(key, clock().date().isoformat()), emit=emit)
+    action='not_submitted'
+    observations=[]
+    original=None
+    prior_attempt=False
+    run_id=run_id or uuid.uuid4().hex
+    def mark(value,day):
+        nonlocal action,original,prior_attempt
+        action=value
+        original=state.submission(key,day)
+        prior_attempt=(value=='recheck' and state.claimed(key,day))
+        emit('submission_action',action=action,submission=original,priorAttempt=prior_attempt)
+    def observed(data,instant):
+        observation=verification_details({'attempt':0,'at':instant.timestamp(),'status':data.get('recordStatusCode')})
+        observations.append(observation);emit('verification',observation=observation)
+    def finished(value):
+        if mode=='checkin':
+            value['submissionAction']=action
+            value['priorAttempt']=prior_attempt
+            value['submission']=original
+            value['verification']=observations
+        return value
+    def recheck(day):
+        mark('recheck',day)
+        return finished(reconcile(school,state,key,day,clock,sleep,emit=emit,observations=observations))
     try:
         data = school.connect()
         instant = clock()
@@ -67,12 +100,13 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
                     "locationConfigured": location_configured(account), "locationSource": location_source(account),
                     **location_details(account)}
         if status in TERMINAL and mode != "prepare":
+            mark('recheck',day);observed(data,instant)
             if status == "CHECKED_IN" and state.claimed(key, day) and verified(data, instant):
                 state.outcome(key, day, "confirmed")
-                return {"result": "confirmed", "businessDate": day, "status": status, "abnormalFlag": False}
-            return {"result": "already_recorded", "businessDate": day, "status": status}
+                return finished({"result": "confirmed", "businessDate": day, "status": status, "abnormalFlag": False})
+            return finished({"result": "already_recorded", "businessDate": day, "status": status})
         if state.claimed(key, day) and mode != "prepare":
-            return reconcile(school, state, key, day, clock, sleep)
+            return recheck(day)
         payload = build_payload(account, instant)
         check_fence(payload, school.locations())
         address = payload["reverseGeocode"]
@@ -94,7 +128,8 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
             raise ToolError("business_date_changed", "today")
         status = valid_today(fresh, instant)
         if status in TERMINAL:
-            return {"result": "already_recorded", "businessDate": day, "status": status}
+            mark('recheck',day);observed(fresh,instant)
+            return finished({"result": "already_recorded", "businessDate": day, "status": status})
         if not window(school.schedule(), clock())["open"]:
             raise ToolError("outside_checkin_window", "schedule")
         instant = clock()
@@ -102,14 +137,23 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
             raise ToolError("business_date_changed", "checkin_post")
         payload = build_payload(account, instant)
         payload["reverseGeocode"] = address
-        if not state.claim(key, day):
-            return reconcile(school, state, key, day, clock, sleep)
+        initial={'attemptId':uuid.uuid4().hex,'originRun':run_id,'startedAt':clock().timestamp(),'outcome':'attempting'}
+        if not state.claim(key, day, initial):
+            return recheck(day)
+        mark('first_submit',day)
         emit("post_claim_saved", businessDate=day)
         try:
             school.submit(payload)
         except ToolError as error:
-            # Even an HTTP/network error may follow an accepted server-side write.
-            emit("post_response_uncertain", reason=error.reason, stage=error.stage)
-        return reconcile(school, state, key, day, clock, sleep)
+            # Preserve the original error before any reconciliation can replace it.
+            outcome='rejected' if error.reason in ('business_error','session_rejected') else 'error' if error.reason in ('http_error','invalid_json','api_contract_changed') else 'unknown'
+            details={**initial,**(school.submission_response or {}),**error_details(error,account),'outcome':outcome,'finishedAt':clock().timestamp()}
+        else:
+            details={**initial,**(school.submission_response or {}),'outcome':'accepted','finishedAt':clock().timestamp()}
+        original=submission_details(details,account)
+        state.record_submission(key,day,original)
+        emit('submission_result',submission=original)
+        return finished(reconcile(school,state,key,day,clock,sleep,emit=emit,observations=observations))
+
     finally:
         transport.save()

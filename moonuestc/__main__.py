@@ -12,6 +12,7 @@ from pathlib import Path
 from . import __version__
 from .client import encrypt_password
 from .errors import ToolError
+from .diagnostics import error_details
 from .locations import list_presets
 from .policy import clock_minutes, now, validate_config
 from .runner import account_key, run_account
@@ -65,9 +66,7 @@ def one_round(config, accounts, state, directory, mode):
             result = run_account(account, mode, state, directory,
                 emit=lambda event, **values: emit(event, account=account["id"], **values))
         except ToolError as error:
-            result = {"result": "error", "reason": error.reason, "stage": error.stage}
-            if error.api_code is not None:
-                result["apiCode"] = error.api_code
+            result = {"result": "error", **error_details(error,account)}
         except (OSError, sqlite3.Error):
             result = {"result": "error", "reason": "private_data_io_error", "stage": "storage"}
         emit("result", account=account["id"], **result)

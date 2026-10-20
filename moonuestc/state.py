@@ -1,10 +1,12 @@
 """One shared execution lock; durable per-account/day POST claims."""
 import contextlib
 import os
+import json
 import sqlite3
 from pathlib import Path
 
 from .errors import ToolError
+from .diagnostics import submission_details
 
 
 @contextlib.contextmanager
@@ -52,6 +54,9 @@ class State:
             CREATE TABLE IF NOT EXISTS claims (
                 account TEXT, day TEXT, outcome TEXT NOT NULL,
                 PRIMARY KEY (account, day));
+            CREATE TABLE IF NOT EXISTS submission_diagnostics (
+                account TEXT, day TEXT, details TEXT NOT NULL,
+                PRIMARY KEY (account, day));
             CREATE TABLE IF NOT EXISTS logins (
                 account TEXT, day TEXT, count INTEGER NOT NULL,
                 PRIMARY KEY (account, day));
@@ -71,11 +76,23 @@ class State:
             self.db.execute("INSERT INTO logins VALUES (?,?,1) ON CONFLICT(account,day) "
                             "DO UPDATE SET count=count+1", (account, day))
 
-    def claim(self, account, day):
+    def claim(self, account, day, submission=None):
         with self.db:
             row = self.db.execute("INSERT OR IGNORE INTO claims VALUES (?,?,?)",
                                   (account, day, "started"))
+            if row.rowcount == 1 and submission is not None:
+                safe=submission_details(submission)
+                self.db.execute("INSERT INTO submission_diagnostics VALUES (?,?,?)",(account,day,json.dumps(safe,ensure_ascii=False,allow_nan=False)))
         return row.rowcount == 1
+
+    def record_submission(self,account,day,details):
+        safe=submission_details(details)
+        with self.db:
+            self.db.execute("UPDATE submission_diagnostics SET details=? WHERE account=? AND day=?",(json.dumps(safe,ensure_ascii=False,allow_nan=False),account,day))
+
+    def submission(self,account,day):
+        row=self.db.execute("SELECT details FROM submission_diagnostics WHERE account=? AND day=?",(account,day)).fetchone()
+        return submission_details(json.loads(row[0])) if row else None
 
     def claimed(self, account, day):
         return self.db.execute("SELECT outcome FROM claims WHERE account=? AND day=?",

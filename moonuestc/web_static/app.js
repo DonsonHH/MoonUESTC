@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id);
 const S={user:null,csrf:'',accounts:[],jobs:[],users:[],presets:[],defaultPresetId:'xuezhi_group3_amap',view:'overview',refreshing:false,editAccount:null,confirm:null};
 const modes={diagnose:'只读诊断',prepare:'位置检查',checkin:'提交打卡'};
-const reasons={need_manual_mfa:'学校要求本人完成二次验证',need_manual_captcha:'学校要求本人完成验证码',login_rejected:'学校登录未成功，请核对凭据',micro_app_unauthorized_after_login:'登录成功，但打卡应用仍未授权',daily_login_limit:'达到当日密码登录次数上限',outside_allowed_location:'配置坐标在允许范围外',outside_checkin_window:'不在学校允许的打卡时段',abnormal_record:'学校记录被标记异常',record_not_confirmed:'学校保存的记录尚未确认',another_run_active:'其他任务正在使用打卡数据',worker_interrupted:'任务在服务器重启时中断，请核对学校记录',job_expired:'任务已跨过业务日期，请重新检查',session_rejected:'学校会话失效',network_error:'网络连接失败',timeout:'请求等待超时',tls_error:'学校 HTTPS 连接失败',dns_error:'学校地址解析失败',worker_internal_error:'任务执行失败，请联系管理员',account_disabled:'账号或所属用户已停用'};
+const reasons={need_manual_mfa:'学校要求本人完成二次验证',need_manual_captcha:'学校要求本人完成验证码',login_rejected:'学校登录未成功，请核对凭据',micro_app_unauthorized_after_login:'登录成功，但打卡应用仍未授权',daily_login_limit:'达到当日密码登录次数上限',outside_allowed_location:'配置坐标在允许范围外',outside_checkin_window:'不在学校允许的打卡时段',abnormal_record:'学校记录被标记异常',record_not_confirmed:'未读到学校签到成功记录',another_run_active:'其他任务正在使用打卡数据',worker_interrupted:'任务在服务器重启时中断，请核对学校记录',job_expired:'任务已跨过业务日期，请重新检查',session_rejected:'学校会话失效',network_error:'网络连接失败',timeout:'请求等待超时',tls_error:'学校 HTTPS 连接失败',dns_error:'学校地址解析失败',worker_internal_error:'任务执行失败，请联系管理员',account_disabled:'账号或所属用户已停用'};
 function node(tag,cls='',value=null){const n=document.createElement(tag);if(cls)n.className=cls;if(value!==null)n.textContent=String(value);return n;}
 function clear(id){$(id).replaceChildren();return $(id);}
 function errorAt(id,message){$(id).textContent=message;$(id).hidden=!message;}
@@ -19,8 +19,74 @@ function cell(title,subtitle){const td=node('td');td.append(node('span','cell-ti
 function mini(label,action,cls='',disabled=false){const b=node('button','mini-button '+cls,label);b.type='button';b.disabled=disabled;b.addEventListener('click',event=>{Promise.resolve().then(()=>action(event)).catch(error=>toast(error.message));});return b;}
 function pending(id){return S.jobs.some(j=>j.account_id===id&&['queued','running'].includes(j.state));}
 function renderAccounts(id,items,compact=false){const container=clear(id);if(!items.length){empty(container,'还没有打卡账号','添加一个学校账号，选择默认位置或手动位置，再从只读诊断开始。','▤');return;}const admin=S.user.role==='admin';const headers=['打卡账号'];if(admin)headers.push('所属用户');headers.push('位置','运行计划','最新状态');if(!compact)headers.push('操作');const {wrap,body}=table(headers);for(const a of items){const tr=node('tr');tr.append(cell(a.label,a.student_id));if(admin)tr.append(cell(a.owner_name,a.owner_username));tr.append(cell(a.locationName||'自定义位置',a.inputCoordinateSystem==='wgs84'?'WGS-84 → GCJ-02':'GCJ-02'));tr.append(cell(a.automatic&&a.enabled?'每日 '+a.run_at:'手动运行',a.enabled?(a.automatic?'自动计划已开启':'自动计划未开启'):'账号已停用'));const td=node('td');const active=S.jobs.find(j=>j.account_id===a.id&&['queued','running'].includes(j.state));const [label,color]=a.enabled?stateInfo(active||a.last_result):['已停用','gray'];td.append(badge(label,color));if(a.last_run_at)td.append(node('span','cell-subtitle',fmt(a.last_run_at,true)));tr.append(td);if(!compact){const actions=node('div','actions');const busy=pending(a.id);actions.append(mini('只读诊断',()=>queue(a,'diagnose'),'',!a.enabled||busy),mini('位置检查',()=>queue(a,'prepare'),'',!a.enabled||busy),mini('提交打卡',()=>confirmSubmit(a),'submit-action',!a.enabled||busy),mini('编辑',()=>openAccount(a),'muted-action',busy),mini('删除',()=>confirmDeleteAccount(a),'danger-action',busy));const ac=node('td');ac.append(actions);tr.append(ac);}body.append(tr);}container.append(wrap);}
-function renderJobs(){const container=clear('jobs-table');if(!S.jobs.length){empty(container,'还没有运行记录','保存账号后，可先执行只读诊断。系统不会因为打开网页或保存配置而提交打卡。','◷');return;}const {wrap,body}=table(['时间','打卡账号','操作','执行方式','状态','结果说明']);for(const job of S.jobs){const tr=node('tr');tr.append(cell(fmt(job.created_at),job.business_date),cell(job.label,job.owner_name),cell(modes[job.mode]||job.mode),cell(job.source==='schedule'?'每日自动':'手动操作'));const td=node('td');td.append(badge(...stateInfo(job)));tr.append(td,cell(['queued','running'].includes(job.state)?'任务处理中':detail(job.result),job.result?.reason||''));body.append(tr);}container.append(wrap);}
-function renderRecent(){const box=clear('recent-jobs');if(!S.jobs.length){empty(box,'每一次运行，都会留下记录','先添加账号，再执行只读诊断和位置检查。');return;}for(const job of S.jobs.slice(0,5)){const row=node('div','recent-job');const info=stateInfo(job);row.append(node('span','job-mark',job.mode==='checkin'?'✓':'◷'));const copy=node('div','recent-copy');copy.append(node('strong','',job.label+' · '+(modes[job.mode]||job.mode)),node('p','',job.owner_name+' · '+(['queued','running'].includes(job.state)?'队列将依次执行':detail(job.result))));row.append(copy,badge(...info),node('time','',fmt(job.created_at,true)));box.append(row);}}
+function submissionInfo(job){
+  if(job.mode!=='checkin')return ['未提交','gray'];
+  const action=job.diagnostics?.action;
+  if(action==='first_submit')return ['首次提交','blue'];
+  if(action==='recheck')return ['仅复查','amber'];
+  if(action==='not_submitted')return ['未提交','gray'];
+  return [['queued','running'].includes(job.state)?'待执行':'旧记录未区分','gray'];
+}
+function responseSummary(value){
+  if(!value)return '';
+  return [value.httpStatus!==undefined?'HTTP '+value.httpStatus:'',value.apiCode!==undefined?'学校业务码 '+value.apiCode:''].filter(Boolean).join(' · ');
+}
+function renderJobs(){
+  const container=clear('jobs-table');
+  if(!S.jobs.length){empty(container,'还没有运行记录','保存账号后，可先执行只读诊断。系统不会因为打开网页或保存配置而提交打卡。','◷');return;}
+  const {wrap,body}=table(['时间','打卡账号','操作','执行方式','提交行为','状态','结果说明','详情']);
+  for(const job of S.jobs){
+    const tr=node('tr');tr.append(cell(fmt(job.created_at),job.business_date),cell(job.label,job.owner_name),cell(modes[job.mode]||job.mode),cell(job.source==='schedule'?'每日自动':'手动操作'));
+    const action=node('td');action.append(badge(...submissionInfo(job)));tr.append(action);
+    const status=node('td');status.append(badge(...stateInfo(job)));tr.append(status);
+    const info=job.diagnostics?.submission||job.diagnostics?.error;
+    tr.append(cell(['queued','running'].includes(job.state)?'任务处理中':detail(job.result),responseSummary(info)||job.result?.reason||''));
+    const td=node('td');td.append(mini('查看详情',()=>openJob(job.id)));tr.append(td);body.append(tr);
+  }
+  container.append(wrap);
+}
+function diagnosticRow(container,label,value){
+  const row=node('div','diagnostic-row');row.append(node('span','',label),node('strong','',value===undefined||value===null||value===''?'—':value));container.append(row);
+}
+async function openJob(id){
+  const result=await api('/api/jobs/'+id);const job=result.job;const diag=job.diagnostics;
+  $('job-dialog-title').textContent=job.label+' · 运行详情';
+  const box=clear('job-diagnostics');
+  diagnosticRow(box,'任务时间',fmt(job.created_at));diagnosticRow(box,'任务结果',stateInfo(job)[0]);diagnosticRow(box,'本次行为',submissionInfo(job)[0]);
+  if(diag?.action==='recheck')box.append(node('p','diagnostic-note','本次只读取学校记录，没有重新提交打卡。下方首次提交信息属于当天原始尝试。'));
+  if(diag?.action==='first_submit')box.append(node('p','diagnostic-note','本次进入首次提交尝试。接口返回成功仍需回读学校当天记录，才能确认签到。'));
+  box.append(node('h3','','首次提交信息'));
+  const original=diag?.submission;
+  if(original){
+    diagnosticRow(box,'首次尝试时间',fmt(original.startedAt));
+    diagnosticRow(box,'提交响应',{accepted:'学校接口返回成功',rejected:'学校接口返回拒绝',error:'提交响应异常',unknown:'未取得明确响应',attempting:'未记录到响应，需核对学校记录'}[original.outcome]||'—');
+    diagnosticRow(box,'HTTP 状态',original.httpStatus);diagnosticRow(box,'学校业务码',original.apiCode);
+    diagnosticRow(box,'脱敏错误信息',original.schoolMessage||'学校未提供错误文字，或内容已省略');
+    if(original.reason)diagnosticRow(box,'错误类型',original.reason);
+    if(original.stage)diagnosticRow(box,'错误阶段',original.stage);
+  }else{
+    const message=diag?.action==='not_submitted'?'本次没有进入提交尝试。':diag?.action==='recheck'&&diag.priorAttempt===false?'本工具当天没有提交尝试，本次直接读取学校已有记录。':'首次提交信息未留存（旧版记录），无法恢复原始错误。';
+    box.append(node('p','diagnostic-note',message));
+  }
+  if(diag?.error){
+    box.append(node('h3','','本次任务错误'));
+    diagnosticRow(box,'错误类型',diag.error.reason);diagnosticRow(box,'错误阶段',diag.error.stage);
+    diagnosticRow(box,'HTTP 状态',diag.error.httpStatus);diagnosticRow(box,'学校业务码',diag.error.apiCode);
+    diagnosticRow(box,'脱敏错误信息',diag.error.schoolMessage);
+  }
+  box.append(node('h3','','本次记录复查'));
+  if(diag?.verification?.length){
+    const names={PENDING:'待打卡',CHECKED_IN:'已签到',STUDENT_REPORTED:'学生已报告',INSTRUCTOR_REPORTED:'辅导员已报告',EXEMPT:'已豁免'};
+    for(const item of diag.verification){
+      const label=(item.attempt===0?'开始时读取':'第 '+item.attempt+' 次复查')+' · '+fmt(item.at);
+      diagnosticRow(box,label,item.status?(names[item.status]||item.status):(reasons[item.reason]||item.reason||'读取失败'));
+      if(item.apiCode!==undefined||item.httpStatus!==undefined)diagnosticRow(box,'复查响应',responseSummary(item));
+      if(item.schoolMessage)diagnosticRow(box,'复查脱敏信息',item.schoolMessage);
+    }
+  }else box.append(node('p','diagnostic-note','没有保存到本次复查详情。旧记录不会补造过程信息。'));
+  $('job-dialog').showModal();
+}
+function renderRecent(){const box=clear('recent-jobs');if(!S.jobs.length){empty(box,'每一次运行，都会留下记录','先添加账号，再执行只读诊断和位置检查。');return;}for(const job of S.jobs.slice(0,5)){const row=node('div','recent-job');const info=stateInfo(job);row.append(node('span','job-mark',job.mode==='checkin'?'✓':'◷'));const copy=node('div','recent-copy');copy.append(node('strong','',job.label+' · '+(modes[job.mode]||job.mode)),node('p','',job.owner_name+' · '+(job.mode==='checkin'?submissionInfo(job)[0]+' · ':'')+(['queued','running'].includes(job.state)?'队列将依次执行':detail(job.result))));row.append(copy,badge(...info),node('time','',fmt(job.created_at,true)));box.append(row);}}
 function renderUsers(){if(S.user.role!=='admin')return;const box=clear('users-table');const {wrap,body}=table(['用户','角色','状态','打卡账号','操作']);for(const user of S.users){const tr=node('tr');tr.append(cell(user.display_name,user.username));const role=node('td');role.append(badge(user.role==='admin'?'管理员':'普通用户',user.role==='admin'?'blue':'gray'));tr.append(role);const active=node('td');active.append(badge(user.active?'已启用':'已停用',user.active?'green':'gray'));if(user.must_change_password)active.append(node('span','cell-subtitle','下次登录需修改密码'));tr.append(active,cell(S.accounts.filter(a=>a.owner_id===user.id).length));const controls=node('div','actions');controls.append(mini('编辑 / 重置密码',()=>openUser(user)));if(user.id!==S.user.id)controls.append(mini('删除',()=>confirmDeleteUser(user),'danger-action'));const td=node('td');td.append(controls);tr.append(td);body.append(tr);}box.append(wrap);}
 function render(){const query=$('account-search').value.trim().toLowerCase();const filtered=S.accounts.filter(a=>(a.label+' '+a.student_id).toLowerCase().includes(query));renderAccounts('accounts-table',filtered);renderAccounts('overview-accounts',S.accounts.slice(0,5),true);$('account-count').textContent=S.accounts.length+' 个账号';$('stat-total').textContent=S.accounts.length;const today=chinaDate();const confirmed=new Set(S.jobs.filter(j=>j.result?.businessDate===today&&(j.result?.result==='confirmed'||j.result?.status==='CHECKED_IN')).map(j=>j.account_id));$('stat-confirmed').textContent=S.accounts.filter(a=>a.confirmed_today||confirmed.has(a.id)).length;$('stat-automatic').textContent=S.accounts.filter(a=>a.enabled&&a.automatic).length;$('stat-attention').textContent=S.accounts.filter(a=>a.enabled&&['error','submission_unknown','record_changed'].includes(a.last_result?.result)).length;renderRecent();renderJobs();renderUsers();}
 async function refresh(){if(S.refreshing||S.user?.must_change_password)return;S.refreshing=true;try{const values=await Promise.all([api('/api/accounts'),api('/api/jobs'),...(S.user.role==='admin'?[api('/api/users')]:[])]);S.accounts=values[0].accounts;S.jobs=values[1].jobs;if(values[2])S.users=values[2].users;render();errorAt('global-error','');}catch(error){errorAt('global-error',error.message);}finally{S.refreshing=false;}}

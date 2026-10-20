@@ -1,3 +1,5 @@
+本地 v0.5.1 诊断修复的验证见 [VALIDATION-DIAGNOSTICS.json](VALIDATION-DIAGNOSTICS.json)。下方保留 v0.5.0 发行记录。
+
 # v0.5.0 验证记录
 
 - 平台：Linux / amd64，Docker 与 Compose v2；应用构建和运行验收均在 Linux 验证主机完成。

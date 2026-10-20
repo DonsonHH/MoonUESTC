@@ -3,6 +3,7 @@ import threading
 import time
 
 from .errors import ToolError
+from .diagnostics import error_details
 from .policy import clock_minutes,now
 from .runner import account_key,run_account
 from .state import State,execution_lock
@@ -38,7 +39,9 @@ class WebWorker:
     def run_one(self):
         job=self.store.claim_job()
         if not job: return False
+        payload=None
         try:
+            self.store.record_job_event(job,'run_started',{})
             if job['business_date']!=now().date().isoformat():
                 raise ToolError('job_expired','worker')
             payload=self.store.job_payload(job)
@@ -46,12 +49,13 @@ class WebWorker:
                 state=State(self.store.directory)
                 try:
                     result=self.runner(payload,job['mode'],state,self.store.directory,
-                        emit=lambda *args,**kwargs:None,
+                        emit=lambda event,**values:self.store.record_job_event(job,event,values,payload),
+                        run_id=job['id'],
                         transport_factory=lambda ua,path:EncryptedTransport(ua,path,self.store))
                 finally: state.close()
         except ToolError as error:
-            result={'result':'error','reason':error.reason,'stage':error.stage}
-            if error.api_code is not None: result['apiCode']=error.api_code
+            result={'result':'error',**error_details(error,payload)}
+            self.store.record_job_event(job,'run_error',{'error':error},payload)
         except WebError as error:
             result={'result':'error','reason':error.code,'stage':'worker'}
         except Exception:
