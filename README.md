@@ -79,7 +79,7 @@ bash install.sh --yes
 docker compose -f compose.yaml -f compose.build.yaml build
 ```
 
-维护者流程见 [发布说明](docs/releasing.md)。GitHub Actions 只上传已通过服务端验证的镜像，不保存部署服务器的 SSH 密钥。
+维护者流程见 [发布说明](docs/releasing.md)；Git 推送、发行上传和 GHCR 发布均需通过 [隐私检查](docs/privacy-release.md)。GitHub Actions 只上传已通过服务端验证的镜像，不保存部署服务器的 SSH 密钥。
 
 ## 许可与致谢
 
