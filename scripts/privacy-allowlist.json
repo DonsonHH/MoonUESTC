@@ -1664,7 +1664,19 @@
       "path": "tests/test_student_scope.py",
       "match_sha256": "44bf0c0e55293dc2fc0446d9353d1ddd732a2371ed044af08db1856ac697f58b",
       "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_auth_recovery.py",
+      "match_sha256": "b7afd8af890c0e23d27cc76c176171bc80b1f828ee294dfcc4b92aa53ae23a0b",
+      "reason": "Reviewed fictional student ID in offline authentication-recovery tests; never a real account or network request. Live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_auth_recovery.py",
+      "match_sha256": "181937129446268a8bb56f7b2c6312250e73dc1efb27f5bd4a3d78d2e3f4ee41",
+      "reason": "Reviewed fictional student ID in offline authentication-recovery tests; never a real account or network request. Live private markers remain unwaivable."
     }
   ],
-  "reviewed_donson_feature_version": "0.5.1+donson.13"
+  "reviewed_donson_feature_version": "0.5.1+donson.14"
 }
