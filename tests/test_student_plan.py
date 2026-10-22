@@ -21,13 +21,13 @@ class StudentPlan(unittest.TestCase):
    self.assertEqual(self.request(path,'PATCH',data,csrf).status_code,400)
  def test_save_daily_variation_and_read_planned_time_without_exposing_seed(self):
   csrf,account=self.prepare();path='/api/accounts/'+account['id']
-  result=self.request(path,'PATCH',{'location':{'mode':'preset','preset':'xuezhi_group5_amap'},'run_at':'21:06','variation':{'minutes':5,'meters':5}},csrf)
+  result=self.request(path,'PATCH',{'location':{'mode':'preset','preset':'xuezhi_group5_amap'},'run_at':'21:06','variation':{'minutes':5,'meters':10}},csrf)
   self.assertEqual(result.status_code,200,result.json);public=result.json['account']
-  self.assertEqual(public['variation'],{'minutes':5,'meters':5});self.assertNotIn('variation_seed',public)
-  self.assertTrue('21:06'<=public['planned_run_at']<='21:11')
+  self.assertEqual(public['variation'],{'minutes':5,'meters':10});self.assertNotIn('variation_seed',public)
+  self.assertTrue('21:06'<=public['planned_run_at']<='21:11:59')
   payload=self.store.job_payload({'account_id':account['id']});self.assertTrue(payload['variation_seed'])
   instant=now();self.assertEqual(build_payload(payload,instant),build_payload(payload,instant))
- def test_client_cannot_set_variation_seed_or_exceed_five_meter_limit(self):
+ def test_client_cannot_set_variation_seed_or_exceed_ten_meter_limit(self):
   csrf,account=self.prepare();path='/api/accounts/'+account['id']
   self.assertEqual(self.request(path,'PATCH',{'variation_seed':'chosen-by-client'},csrf).status_code,400)
-  self.assertEqual(self.request(path,'PATCH',{'variation':{'meters':6}},csrf).status_code,400)
+  self.assertEqual(self.request(path,'PATCH',{'location':{'mode':'preset','preset':'xuezhi_group5_amap'},'variation':{'meters':11}},csrf).status_code,400)

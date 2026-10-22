@@ -1,7 +1,7 @@
 """Primary starts use the first half-minute; delayed retries reserve the second."""
 import datetime as dt,math
 from .daily_plan import minute,sample,normalize_variation
-from .policy import SHANGHAI
+from .policy import SHANGHAI,now
 
 def slot_bounds(bounds):
     low,high=map(minute,bounds or ('21:06','23:24'))
@@ -9,11 +9,16 @@ def slot_bounds(bounds):
 
 def clock(value):return '%02d:%02d'%divmod(value,60)
 
-def reserve_slot(db,account_id,preferred,bounds,*,replace=False,school=None):
+def reserve_slot(db,account_id,preferred,bounds,*,replace=False,school=None,account=None,day=None):
     if not bounds:return None
+    day=day or now().date().isoformat()
+    account=account or {'id':account_id,'variation':{'minutes':5,'meters':0}}
+    spread=normalize_variation(account.get('variation'))['minutes']
     low,high=slot_bounds(bounds)
     if school:
         low=max(low,minute(school['start']));high=min(high,minute(school['end'])-7)
+    low=max(low,minute(preferred)-spread);high=min(high,minute(preferred)+spread)
+    db.execute('DELETE FROM web_schedule_slots WHERE business_date!=?',(day,))
     existing=db.execute('SELECT minute FROM web_schedule_slots WHERE account_id=?',(account_id,)).fetchone()
     if existing and low<=existing[0]<=high and not replace:return existing[0]
     used={r[0] for r in db.execute('SELECT minute FROM web_schedule_slots WHERE account_id!=?',(account_id,))}
@@ -21,8 +26,10 @@ def reserve_slot(db,account_id,preferred,bounds,*,replace=False,school=None):
     if not candidates:
         if existing and not low<=existing[0]<=high:db.execute('DELETE FROM web_schedule_slots WHERE account_id=?',(account_id,))
         return None
-    chosen=min(candidates,key=lambda value:(abs(value-minute(preferred)),value))
-    db.execute('INSERT INTO web_schedule_slots VALUES(?,?) ON CONFLICT(account_id) DO UPDATE SET minute=excluded.minute',(account_id,chosen))
+    offset=int(sample(account,day,'time')*(spread*2+1))-spread if spread else 0
+    target=max(low,min(high,minute(preferred)+offset))
+    chosen=min(candidates,key=lambda value:(abs(value-target),sample(account,day,'tie:'+str(value))))
+    db.execute('INSERT INTO web_schedule_slots(account_id,minute,business_date) VALUES(?,?,?) ON CONFLICT(account_id) DO UPDATE SET minute=excluded.minute,business_date=excluded.business_date',(account_id,chosen,day))
     return chosen
 
 def slot_target(account,day,reservation):

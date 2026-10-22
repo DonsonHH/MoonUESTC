@@ -103,14 +103,30 @@ class WebStore:
             if 'attempt' not in columns:db.execute('ALTER TABLE web_jobs ADD COLUMN attempt INTEGER NOT NULL DEFAULT 0')
             if 'available_at' not in columns:db.execute('ALTER TABLE web_jobs ADD COLUMN available_at REAL NOT NULL DEFAULT 0')
             if 'execute_before' not in columns:db.execute('ALTER TABLE web_jobs ADD COLUMN execute_before REAL NOT NULL DEFAULT 0')
+            if 'business_date' not in {r[1] for r in db.execute('PRAGMA table_info(web_schedule_slots)')}:db.execute("ALTER TABLE web_schedule_slots ADD COLUMN business_date TEXT NOT NULL DEFAULT ''")
         self._upgrade_group3_accounts()
         self._sync_student_labels()
+        self._upgrade_variation_radius()
         self.ensure_slots()
 
-    def ensure_slots(self):
-        if not self.execution_window:return
+    def _upgrade_variation_radius(self):
         with self.db(True) as db:
-            for row in db.execute('SELECT id,run_at,last_result FROM web_accounts ORDER BY created_at,id').fetchall():reserve_slot(db,row['id'],row['run_at'],self.execution_window,school=(json.loads(row['last_result']) if row['last_result'] else {}).get('checkinWindow'))
+            name='daily_radius_10m_v1'
+            if db.execute('SELECT 1 FROM web_migrations WHERE name=?',(name,)).fetchone():return
+            stamp=time.time()
+            for row in db.execute('SELECT * FROM web_accounts').fetchall():
+                payload=self._payload(row);variation=normalize_variation(payload.get('variation'))
+                if 0<variation['meters']<10:
+                    payload['variation']={**variation,'meters':10}
+                    db.execute('UPDATE web_accounts SET payload=?,updated_at=? WHERE id=?',(self.vault.seal(payload,'account:'+row['id']),stamp,row['id']))
+            db.execute('INSERT INTO web_migrations VALUES(?,?)',(name,stamp))
+
+    def ensure_slots(self,day=None):
+        if not self.execution_window:return
+        day=day or now().date().isoformat()
+        with self.db(True) as db:
+            rows=db.execute('SELECT * FROM web_accounts ORDER BY created_at,id').fetchall()
+            for row in rows:reserve_slot(db,row['id'],row['run_at'],self.execution_window,school=(json.loads(row['last_result']) if row['last_result'] else {}).get('checkinWindow'),account=self._payload(row),day=day)
 
     def _sync_student_labels(self):
         with self.db(True) as db:
@@ -184,41 +200,6 @@ class WebStore:
                 raise WebError(409,'username_exists','用户名已存在。') from None
             row=db.execute('SELECT * FROM web_users WHERE id=?',(cur.lastrowid,)).fetchone()
             self._audit(db,actor,'user_created',row['id'])
-            return public_user(row)
-
-    def register_user(self,data,remote_ip):
-        """Public signup always creates an ordinary user with a user-chosen password."""
-        if not isinstance(data,dict) or set(data)!={'username','password'}:
-            raise WebError(400,'invalid_fields','注册只接受用户名和密码。')
-        stamp=time.time()
-        buckets=[(self.vault.digest('registration_ip',str(remote_ip)),20,900),
-                 (self.vault.digest('registration_global','all'),60,3600)]
-        # Reserve the attempt atomically before the expensive password hash.
-        with self.db(True) as db:
-            if not db.execute("SELECT 1 FROM web_users WHERE role='admin' AND active=1 LIMIT 1").fetchone():
-                raise WebError(503,'not_initialized','管理员尚未初始化，请联系管理员。')
-            db.execute('DELETE FROM web_login_limits WHERE reset_at<=?',(stamp,))
-            for bucket,limit,window in buckets:
-                row=db.execute('SELECT * FROM web_login_limits WHERE bucket=?',(bucket,)).fetchone()
-                if row and row['count']>=limit:
-                    raise WebError(429,'registration_rate_limited','注册请求过多，请稍后重试。')
-            for bucket,limit,window in buckets:
-                db.execute('INSERT INTO web_login_limits VALUES(?,1,?) ON CONFLICT(bucket) DO UPDATE SET count=count+1',
-                           (bucket,stamp+window))
-        username=text(data.get('username'),'用户名',3,48)
-        if not re.fullmatch(r'[\w.@-]+',username):
-            raise WebError(400,'invalid_username','用户名可用中英文、数字、点、短横线或下划线。')
-        encoded=self.hasher.hash(login_password(data.get('password')))
-        with self.db(True) as db:
-            if not db.execute("SELECT 1 FROM web_users WHERE role='admin' AND active=1 LIMIT 1").fetchone():
-                raise WebError(503,'not_initialized','管理员尚未初始化，请联系管理员。')
-            try:
-                cur=db.execute("INSERT INTO web_users(username,username_key,display_name,password_hash,role,active,must_change_password,created_at) VALUES(?,?,?,?,'user',1,0,?)",
-                               (username,username.casefold(),username,encoded,stamp))
-            except sqlite3.IntegrityError:
-                raise WebError(409,'username_exists','用户名已存在，请换一个用户名。') from None
-            row=db.execute('SELECT * FROM web_users WHERE id=?',(cur.lastrowid,)).fetchone()
-            self._audit(db,row,'user_registered',row['id'])
             return public_user(row)
 
     def _verify(self,encoded,password):
@@ -355,6 +336,9 @@ class WebStore:
         with self.db() as db:
             reservation=db.execute('SELECT minute FROM web_schedule_slots WHERE account_id=?',(row['id'],)).fetchone()
             verified=db.execute('SELECT verified_at FROM portal_bindings WHERE account_id=?',(row['id'],)).fetchone()
+            today_job=db.execute("SELECT id,state,source,result,created_at FROM web_jobs WHERE account_id=? AND business_date=? AND mode='checkin' ORDER BY created_at DESC,id DESC LIMIT 1",(row['id'],now().date().isoformat())).fetchone()
+        today_result=json.loads(today_job['result']) if today_job and today_job['result'] else None
+        recorded_today=confirmed_today or bool(today_result and today_result.get('result') in ('confirmed','already_recorded') and today_result.get('status') in ('CHECKED_IN','EXEMPT','STUDENT_REPORTED','INSTRUCTOR_REPORTED'))
         if not auth_reason and row['last_run_at'] and row['last_run_at']>=(verified[0] if verified else 0) and (last or {}).get('reason') in ('need_manual_captcha','need_manual_mfa','login_rejected','daily_login_limit'):
             auth_reason=last['reason']
         if self.execution_window:target=slot_target(payload,now().date().isoformat(),reservation[0]) if reservation else None
@@ -364,6 +348,8 @@ class WebStore:
                 'location':payload.get('location'),'has_password':bool(payload.get('password')),
                 'has_browser_fingerprint':bool(payload.get('browser_fingerprint')),'ready_for_automation':ready,
                 'confirmed_today':confirmed_today,
+                'recorded_today':recorded_today,'business_date':now().date().isoformat(),'server_time':now().timestamp(),
+                'today_job':({'id':today_job['id'],'state':today_job['state'],'source':today_job['source'],'result':today_result,'created_at':today_job['created_at']} if today_job else None),
                 'variation':variation,'planned_run_at':target,'location_open':self.location_open(payload),'execution_window':self.execution_window,
                 'schedule_slot':slot_description(reservation[0]) if reservation else None,
                 'school_auth_required':bool(auth_reason),'school_auth_reason':auth_reason,
@@ -373,6 +359,7 @@ class WebStore:
                 'last_run_at':row['last_run_at'],**location_details(payload)}
 
     def accounts(self,actor):
+        self.ensure_slots()
         with self.db() as db:
             rows=db.execute('SELECT a.*,u.username AS owner_username,u.display_name AS owner_name,u.role AS owner_role FROM web_accounts a JOIN web_users u ON u.id=a.owner_id'+
                 ('' if actor['role']=='admin' else ' WHERE a.owner_id=?')+' ORDER BY a.created_at',
@@ -405,7 +392,7 @@ class WebStore:
                     payload[key]=copy.deepcopy(data[key])
             payload.setdefault('location',{'mode':'preset','preset':DEFAULT_PRESET_ID})
             try:payload['variation']=normalize_variation(data.get('variation',payload.get('variation')))
-            except ToolError:raise WebError(400,'invalid_daily_variation','每日时间浮动最多 5 分钟，位置浮动最多 5 米。') from None
+            except ToolError:raise WebError(400,'invalid_daily_variation','每日时间浮动最多 5 分钟，位置浮动最多 10 米。') from None
             if any(payload['variation'].values()):payload.setdefault('variation_seed',secrets.token_hex(32))
             if not self.location_open(payload):raise WebError(400,'location_not_open','目前只开放学知二组团和学知五组团，请重新选择位置。')
             linked=db.execute('SELECT 1 FROM portal_bindings WHERE account_id=?',(account_id or '',)).fetchone()
@@ -449,8 +436,8 @@ class WebStore:
                         (aid,owner,label,digest,encrypted,int(enabled),int(automatic),run_at,stamp,stamp))
             except sqlite3.IntegrityError:
                 raise WebError(409,'student_exists','该学号已添加，请由管理员核对所属用户。') from None
-            assigned=reserve_slot(db,aid,run_at,self.execution_window,replace=bool(old and old['run_at']!=run_at),school=(json.loads(old['last_result']) if old and old['last_result'] else {}).get('checkinWindow'))
-            if automatic and self.execution_window and assigned is None:raise WebError(409,'schedule_slots_full','执行时段已满，暂时不能开启每日计划，请联系管理员。')
+            assigned=reserve_slot(db,aid,run_at,self.execution_window,replace=bool(old and (old['run_at']!=run_at or self._payload(old).get('variation')!=payload.get('variation'))),school=(json.loads(old['last_result']) if old and old['last_result'] else {}).get('checkinWindow'),account=payload,day=now().date().isoformat())
+            if automatic and self.execution_window and assigned is None:raise WebError(409,'schedule_slots_full','偏好时间附近没有空闲时段，请调整时间后再开启每日计划。')
             self._audit(db,actor,'account_updated' if old else 'account_created',aid)
         return self.account(actor,aid)
 
@@ -623,6 +610,7 @@ class WebStore:
                 query+=" AND (u.role='admin' OR EXISTS (SELECT 1 FROM portal_notices n WHERE n.user_id=u.id AND n.version=?))";params.append(NOTICE_VERSION)
             if business_day:
                 query+=" AND NOT EXISTS (SELECT 1 FROM web_jobs j WHERE j.account_id=a.id AND j.source='schedule' AND j.business_date=?)";params.append(business_day)
+                query+=" AND NOT EXISTS (SELECT 1 FROM web_jobs j WHERE j.account_id=a.id AND j.mode='checkin' AND j.business_date=? AND j.state='done' AND json_extract(j.result,'$.result') IN ('confirmed','already_recorded'))";params.append(business_day)
             return [dict(r) for r in db.execute(query,params)]
 
     def notice_accepted(self,user):

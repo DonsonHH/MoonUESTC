@@ -1,8 +1,0 @@
-{
-  "mode": "fixed",
-  "name": "我的自定义位置",
-  "latitude": null,
-  "longitude": null,
-  "reverse_geocode": "",
-  "coordinate_system": "gcj02"
-}

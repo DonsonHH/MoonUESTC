@@ -199,31 +199,6 @@ class PrivacyTests(unittest.TestCase):
         entries.append(("orphan.blob",b"opaque encrypted archive"))
         with self.assertRaises(ValueError):privacy.Scanner().archive(tar_bytes(entries),"image.tar")
 
-    def test_all_release_assets_require_integrity_and_privacy(self):
-        spec=importlib.util.spec_from_file_location("asset_gate",SCRIPTS/"verify-release-artifacts.py")
-        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-        with tempfile.TemporaryDirectory() as tmp:
-            path=Path(tmp);tag="v9.9.9"
-            z=io.BytesIO()
-            with zipfile.ZipFile(z,"w") as a:a.writestr("README.md","synthetic clean")
-            mapping={"source.zip":z.getvalue(),"deploy.zip":z.getvalue(),
-                     "deploy.tar.gz":gzip.compress(tar_bytes([("README.md",b"clean")])),
-                     "linux-amd64.image.tar.gz":gzip.compress(image_bytes([tar_bytes([("app/ok.py",b"pass")])])),
-                     "validation.json":b"{}"}
-            for name,data in mapping.items():(path/("MoonUESTC-"+tag+"-"+name)).write_bytes(data)
-            def checksums():
-                files=[p for p in path.iterdir() if p.name!="SHA256SUMS.release.txt"]
-                (path/"SHA256SUMS.release.txt").write_text("".join(hashlib.sha256(p.read_bytes()).hexdigest()+"  "+p.name+"\n" for p in files))
-            checksums()
-            scanner=privacy.Scanner();module.verify(path,tag,scanner);self.assertTrue(scanner.report()["passed"])
-            (path/"unlisted.json").write_text("{}")
-            with self.assertRaises(ValueError):module.verify(path,tag,privacy.Scanner())
-            (path/"unlisted.json").unlink()
-            (path/("MoonUESTC-"+tag+"-validation.json")).write_bytes(token())
-            with self.assertRaises(ValueError):module.verify(path,tag,privacy.Scanner())
-            checksums();scanner=privacy.Scanner();module.verify(path,tag,scanner)
-            self.assertFalse(scanner.report()["passed"])
-
     def test_private_identifier_in_filename_is_blocked(self):
         marker="synthetic-identifier-9741"
         scanner=self.scan(b"clean",marker+".txt",markers=[marker])

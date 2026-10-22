@@ -11,7 +11,6 @@ from flask import Flask,g,jsonify,redirect,request,send_from_directory
 from werkzeug.exceptions import HTTPException
 
 from . import __version__
-from .captcha import RegistrationCaptcha
 from .errors import ToolError
 from .locations import DEFAULT_PRESET_ID,list_presets
 from .web_errors import WebError
@@ -45,7 +44,6 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
     secure=origin.startswith('https://')
     os.umask(0o077)
     static=Path(__file__).with_name('web_static')
-    pages=Path(__file__).with_name('web_pages')
     app=Flask(__name__,static_folder=str(static),static_url_path='/static')
     app.config.update(MAX_CONTENT_LENGTH=32768,MAX_FORM_MEMORY_SIZE=32768,MAX_FORM_PARTS=10,
                       JSON_SORT_KEYS=False,PROPAGATE_EXCEPTIONS=False)
@@ -54,10 +52,8 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
     from .portal import PortalAuth
     portal=PortalAuth(store,school_verifier)
     worker=WebWorker(store,runner)
-    registration_captcha=RegistrationCaptcha(store)
     app.extensions['moon_store']=store
     app.extensions['moon_worker']=worker
-    app.extensions['moon_captcha']=registration_captcha
     app.extensions['moon_portal']=portal
     app.config['MOON_PORTAL_ENABLED']=(os.environ.get('MOON_ENABLE_PORTAL','0')=='1' if portal_enabled is None else bool(portal_enabled))
     surface=surface or os.environ.get('MOON_SURFACE') or ('public' if app.config['MOON_PORTAL_ENABLED'] else 'combined')
@@ -74,7 +70,7 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
         except ValueError:pass
         return remote
     app.config['MOON_ORIGIN']=origin
-    app.config['MOON_REGISTRATION_ENABLED']=(os.environ.get('MOON_ALLOW_REGISTRATION','1')=='1' if registration_enabled is None else bool(registration_enabled))
+    app.config['MOON_REGISTRATION_ENABLED']=False
     if browser_bridge is None and os.environ.get('MOON_BROWSER_ASSIST_URL') and os.environ.get('MOON_BROWSER_ASSIST_KEY'):
         from .assisted_auth import BrowserBridge
         browser_bridge=BrowserBridge(os.environ['MOON_BROWSER_ASSIST_URL'],os.environ['MOON_BROWSER_ASSIST_KEY'])
@@ -214,14 +210,14 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
             identity=current()
             return redirect('/admin' if identity and identity[0]['role']=='admin' else '/app' if identity else '/login')
         if not current(): return redirect('/login')
-        return send_from_directory(pages,'app.html')
+        return send_from_directory(static/'ui','index.html')
 
     @app.get('/login')
     def login_page():
         if surface=='admin':return redirect('/admin/login')
         if app.config['MOON_PORTAL_ENABLED']:return send_from_directory(static/'ui','index.html')
         if current(): return redirect('/')
-        return send_from_directory(pages,'login.html')
+        return send_from_directory(static/'ui','index.html')
 
     @app.get('/admin')
     @app.get('/admin/login')
@@ -249,31 +245,10 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
         return response_ok({'authenticated':True,'user':user,'csrf_token':csrf,'notice_required':portal.require_notice and not store.notice_accepted(user),'https':secure,'version':__version__,'portal_enabled':app.config['MOON_PORTAL_ENABLED'],'onboarding_available':app.config['MOON_ASSIST_ENABLED'],'registration_enabled':app.config['MOON_REGISTRATION_ENABLED'] and store.initialized()})
 
     @app.get('/register')
-    def register_page():
-        if current(): return redirect('/')
-        if not app.config['MOON_REGISTRATION_ENABLED']:
-            raise WebError(403,'registration_disabled','管理员已关闭自助注册。')
-        if not store.initialized():
-            raise WebError(503,'not_initialized','管理员尚未初始化，请联系管理员。')
-        return send_from_directory(pages,'register.html')
-
     @app.post('/api/register')
-    def register():
-        if not app.config['MOON_REGISTRATION_ENABLED']:
-            raise WebError(403,'registration_disabled','管理员已关闭自助注册。')
-        value=body()
-        if set(value)-{'username','password','altcha'}:
-            raise WebError(400,'invalid_fields','注册只接受用户名、密码和验证信息。')
-        proof=value.pop('altcha',None)
-        registration_captcha.consume(proof,client_ip())
-        user=store.register_user(value,client_ip())
-        return response_ok({'user':user},201)
-
     @app.get('/api/registration/challenge')
-    def registration_challenge():
-        if not app.config['MOON_REGISTRATION_ENABLED']:
-            raise WebError(403,'registration_disabled','管理员已关闭自助注册。')
-        return jsonify(registration_captcha.issue(client_ip()))
+    def registration_disabled():
+        raise WebError(403,'registration_disabled','请使用学校账号登录并完成身份验证。')
 
     @app.post('/api/login')
     @app.post('/api/admin/login')

@@ -1,9 +1,0 @@
-# Developer build override: docker compose -f compose.yaml -f compose.build.yaml build
-services:
-  moonuestc:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        PYTHON_BASE_IMAGE: "${PYTHON_BASE_IMAGE:-python:3.12-slim-bookworm}"
-        VCS_REF: "${VCS_REF:-unreleased}"

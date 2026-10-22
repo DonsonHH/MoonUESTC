@@ -6,7 +6,7 @@ def normalize_variation(value=None):
     value={} if value is None else value
     if not isinstance(value,dict) or set(value)-{'minutes','meters'}:raise ToolError('invalid_daily_variation','config')
     result={key:value.get(key,0) for key in ('minutes','meters')}
-    if any(type(n) is not int or not 0<=n<=5 for n in result.values()):raise ToolError('invalid_daily_variation','config')
+    if any(type(result[key]) is not int or not 0<=result[key]<=limit for key,limit in (('minutes',5),('meters',10))):raise ToolError('invalid_daily_variation','config')
     return result
 
 def sample(account,day,purpose):

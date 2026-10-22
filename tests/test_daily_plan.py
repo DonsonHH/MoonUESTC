@@ -3,17 +3,17 @@ import tempfile
 from moonuestc.daily_plan import normalize_variation,planned_time,position_for,verify_circle
 from moonuestc.errors import ToolError
 
-ACCOUNT={'id':'synthetic','student_id':'202600000001','variation_seed':'synthetic-only','variation':{'minutes':5,'meters':5}}
+ACCOUNT={'id':'synthetic','student_id':'202600000001','variation_seed':'synthetic-only','variation':{'minutes':5,'meters':10}}
 class DailyPlan(unittest.TestCase):
  def test_daily_values_are_stable_for_refresh_retry_and_restart(self):
   a=position_for(ACCOUNT,'2026-10-22',30.753607,103.935437)
   self.assertEqual(a,position_for(dict(ACCOUNT),'2026-10-22',30.753607,103.935437))
   self.assertNotEqual(a,position_for(ACCOUNT,'2026-10-23',30.753607,103.935437))
- def test_all_daily_points_stay_inside_five_meter_circle(self):
+ def test_all_daily_points_stay_inside_ten_meter_circle(self):
   for day in range(365):
    date=(dt.date(2026,1,1)+dt.timedelta(days=day)).isoformat();lat,lng=position_for(ACCOUNT,date,30.753607,103.935437)
    distance=6371000*math.hypot(math.radians(lat-30.753607),math.radians(lng-103.935437)*math.cos(math.radians(30.753607)))
-   self.assertLessEqual(distance,5.00001)
+   self.assertLessEqual(distance,10.00001)
  def test_times_are_per_day_and_clamped_to_user_and_school_windows(self):
   for day in range(100):
    date=(dt.date(2026,1,1)+dt.timedelta(days=day)).isoformat()
@@ -25,11 +25,11 @@ class DailyPlan(unittest.TestCase):
  def test_no_variation_preserves_exact_existing_coordinates(self):
   self.assertEqual(position_for({},'2026-10-22',30.7,103.9),(30.7,103.9))
  def test_invalid_ranges_and_bool_are_rejected(self):
-  for value in ({'minutes':6},{'meters':6},{'meters':True},{'minutes':-1},{'anything':5}):
+  for value in ({'minutes':6},{'meters':11},{'meters':True},{'minutes':-1},{'anything':5}):
    with self.assertRaises(ToolError):normalize_variation(value)
  def test_entire_circle_must_fit_school_fence_without_snapping(self):
   fence=[{'latitude':30.753587,'longitude':103.935454,'radiusMeter':150}]
-  verify_circle(30.753607,103.935437,5,fence)
+  verify_circle(30.753607,103.935437,10,fence)
   with self.assertRaises(ToolError):verify_circle(30.753780,103.932328,5,fence)
   with self.assertRaises(ToolError):verify_circle(30.753587,103.935454,5,[dict(fence[0],radiusMeter=3)])
 
@@ -39,7 +39,7 @@ class DailyExecution(unittest.TestCase):
   from test_workflows import INSTANT
   from moonuestc.state import State
   from moonuestc.runner import run_account
-  account={**fixed_account(),'variation':{'minutes':5,'meters':5},'variation_seed':'synthetic-only','_execution_window':('21:06','23:24')}
+  account={**fixed_account(),'variation':{'minutes':5,'meters':10},'variation_seed':'synthetic-only','_execution_window':('21:06','23:24')}
   transport=RecordingTransport();transport.timeout_post=True
   with tempfile.TemporaryDirectory() as root:
    state=State(root)

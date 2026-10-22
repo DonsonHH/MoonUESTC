@@ -2,7 +2,7 @@
 
 Forward-transform formula ported from wandergis/coordtransform (MIT).
 This is not an official map-provider calibration or a school validation.
-See third_party/coordtransform.LICENSE and COORDINATE-SOURCE.json.
+See third_party/coordtransform.LICENSE; named campus points are in locations.py.
 """
 import math
 from .errors import ToolError

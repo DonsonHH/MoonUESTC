@@ -29,7 +29,7 @@ class WebWorker:
         instant=now()
         minute=instant.hour*60+instant.minute
         day=instant.date().isoformat()
-        self.store.ensure_slots()
+        self.store.ensure_slots(day=day)
         for row in self.store.automatic_accounts(day):
             try:
                 payload=self.store.vault.open(row['payload'],'account:'+row['id'])

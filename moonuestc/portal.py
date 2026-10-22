@@ -168,7 +168,7 @@ class PortalAuth:
         payload={**previous,'id':account['id'] if account else uuid.uuid4().hex,'enabled':True,
                  'student_id':student,'password':password,'browser_fingerprint':fingerprint,'user_agent':ua,
                  'location':previous.get('location',None if self.store.allowed_presets else {'mode':'preset','preset':'xuezhi_group3_amap'}),
-                 'variation':previous.get('variation',{'minutes':5,'meters':5} if self.store.allowed_presets and not previous else {'minutes':0,'meters':0})}
+                 'variation':previous.get('variation',{'minutes':5,'meters':10} if self.store.allowed_presets and not previous else {'minutes':0,'meters':0})}
         if auth_flow and isinstance(device_profile,str) and re.fullmatch('[a-f0-9]{24}',device_profile):payload['browser_profile']=device_profile
         try:validate_config({'version':1,'accounts':[payload]})
         except ToolError:
@@ -259,7 +259,7 @@ class PortalAuth:
                     self.store._audit(db,user,'school_profile_updated',user['id'])
             db.execute('UPDATE web_accounts SET label=(SELECT display_name FROM web_users WHERE id=?) WHERE id=?',(user['id'],aid))
             row=db.execute('SELECT run_at FROM web_accounts WHERE id=?',(aid,)).fetchone()
-            reserve_slot(db,aid,row['run_at'],self.store.execution_window)
+            reserve_slot(db,aid,row['run_at'],self.store.execution_window,account=payload,day=dt.datetime.fromtimestamp(stamp,SHANGHAI).date().isoformat())
             if data.get('consent_version')==NOTICE_VERSION:
                 db.execute('INSERT INTO portal_notices VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET version=excluded.version,accepted_at=excluded.accepted_at',(user['id'],NOTICE_VERSION,stamp))
             db.execute('DELETE FROM web_login_limits WHERE bucket=?',(bucket,))

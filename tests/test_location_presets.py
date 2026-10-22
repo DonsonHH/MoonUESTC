@@ -92,15 +92,6 @@ class NamedLocations(unittest.TestCase):
             self.assertEqual(preset['reverse_geocode'],'')
         self.assertEqual(len(list_presets()),8)
 
-    def test_new_configuration_template_defaults_to_the_requested_preset(self):
-        path = Path(__file__).resolve().parents[1] / "config.example.json"
-        config = json.loads(path.read_text(encoding="utf-8"))
-        self.assertFalse(config["automation_enabled"])
-        self.assertEqual(config["accounts"][0]["location"], {"mode":"preset","preset":DEFAULT_PRESET_ID})
-        account = preset_account()
-        validate_config({"version":1,"accounts":[account]})
-        self.assertTrue(location_configured(account))
-
     def test_chinese_display_name_can_select_the_new_preset(self):
         payload = build_payload(preset_account(preset="学知三组团"), fixtures.INSTANT)
         self.assertEqual(payload["latitude"],30.754874)

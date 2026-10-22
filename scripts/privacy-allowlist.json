@@ -1676,7 +1676,31 @@
       "path": "tests/test_auth_recovery.py",
       "match_sha256": "181937129446268a8bb56f7b2c6312250e73dc1efb27f5bd4a3d78d2e3f4ee41",
       "reason": "Reviewed fictional student ID in offline authentication-recovery tests; never a real account or network request. Live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_daily_reservations.py",
+      "match_sha256": "b07efcdeb1a82e583eac18fed6aeb1a215b573ecdfa3ac1acbd97cfea34e6e15",
+      "reason": "Reviewed offline fixture operator label/password for daily scheduling and migration regression. No real account or network request; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_daily_reservations.py",
+      "match_sha256": "b8c3bcfbf08d66191a2d0f996f686727ee202e5ff67def3b4969f9b082967f15",
+      "reason": "Reviewed offline fixture operator label/password for daily scheduling and migration regression. No real account or network request; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_variation_migration.py",
+      "match_sha256": "b07efcdeb1a82e583eac18fed6aeb1a215b573ecdfa3ac1acbd97cfea34e6e15",
+      "reason": "Reviewed offline fixture operator label/password for daily scheduling and migration regression. No real account or network request; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_variation_migration.py",
+      "match_sha256": "b8c3bcfbf08d66191a2d0f996f686727ee202e5ff67def3b4969f9b082967f15",
+      "reason": "Reviewed offline fixture operator label/password for daily scheduling and migration regression. No real account or network request; live private markers remain unwaivable."
     }
   ],
-  "reviewed_donson_feature_version": "0.5.1+donson.14"
+  "reviewed_donson_feature_version": "0.5.1+donson.16"
 }
