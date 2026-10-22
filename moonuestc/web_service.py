@@ -13,7 +13,7 @@ from .web_errors import WebError
 from .daily_plan import planned_time
 from .scheduling import slot_target
 
-RETRY_REASONS={'need_manual_mfa','need_manual_captcha','login_rejected','session_rejected','portal_session_rejected','micro_app_unauthorized','timeout','network_error','connection_error','http_error','invalid_json','record_not_confirmed','worker_internal_error','dns_error','reserved_slot_expired'}
+RETRY_REASONS={'session_rejected','portal_session_rejected','micro_app_unauthorized','timeout','network_error','connection_error','http_error','invalid_json','record_not_confirmed','worker_internal_error','dns_error','reserved_slot_expired'}
 
 
 class WebWorker:
@@ -42,7 +42,7 @@ class WebWorker:
                 elif minute<clock_minutes(target):continue
                 if self.store.execution_window and minute>clock_minutes(self.store.execution_window[1]):continue
                 state=State(self.store.directory)
-                try: ready=state.ready(account_key(payload))
+                try: ready=state.ready(account_key(payload)) and not state.auth_requirement(account_key(payload))
                 finally: state.close()
                 if not ready: continue
                 start=end=0

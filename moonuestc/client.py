@@ -56,9 +56,10 @@ def encrypt_password(password, salt):
 
 
 class School:
-    def __init__(self, transport, account, budget, emit=lambda *args,**kwargs: None):
+    def __init__(self, transport, account, budget, emit=lambda *args,**kwargs: None, *, before_login=lambda:None):
         self.transport, self.account, self.budget, self.emit = transport, account, budget, emit
         self.submission_response = None
+        self.before_login=before_login
 
     def api(self, path, *, stage, payload=None):
         r = self.transport.request("POST" if payload is not None else "GET",
@@ -144,6 +145,7 @@ class School:
             except AuthRequired:
                 self.emit("stage_failed", stage="cached_session")
         # Fresh Cookie jar, one credential POST, then require business authorization.
+        self.before_login()
         self.transport.clear()
         self.transport.fingerprint(self.account["browser_fingerprint"])
         r = self.transport.request("GET", ORIGIN + "/", stage="platform_previsit")

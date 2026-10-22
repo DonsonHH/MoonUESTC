@@ -70,6 +70,8 @@ class State:
                 account TEXT, day TEXT, count INTEGER NOT NULL,
                 PRIMARY KEY (account, day));
             CREATE TABLE IF NOT EXISTS readiness (account TEXT PRIMARY KEY);
+            CREATE TABLE IF NOT EXISTS auth_recovery (
+                account TEXT PRIMARY KEY,reason TEXT NOT NULL,required_at REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS daily (
                 account TEXT, day TEXT, result TEXT NOT NULL,
                 PRIMARY KEY (account, day));
@@ -110,12 +112,32 @@ class State:
     def login_budget(self, account, day):
         with self.db:
             self.db.execute("BEGIN IMMEDIATE")
-            row = self.db.execute("SELECT count FROM logins WHERE account=? AND day=?",
-                                  (account, day)).fetchone()
-            if row and row[0] >= 3:
-                raise ToolError("daily_login_limit", "cas_submit")
+            self.check_unattended_login(account,day)
             self.db.execute("INSERT INTO logins VALUES (?,?,1) ON CONFLICT(account,day) "
                             "DO UPDATE SET count=count+1", (account, day))
+
+    def auth_requirement(self,account):
+        row=self.db.execute('SELECT reason FROM auth_recovery WHERE account=?',(account,)).fetchone()
+        return row[0] if row else None
+
+    def login_exhausted(self,account,day):
+        row=self.db.execute('SELECT count FROM logins WHERE account=? AND day=?',(account,day)).fetchone()
+        return bool(row and row[0]>=3)
+
+    def check_unattended_login(self,account,day):
+        reason=self.auth_requirement(account)
+        if reason:raise ToolError(reason,'local_auth_guard')
+        if self.login_exhausted(account,day):raise ToolError('daily_login_limit','local_auth_guard')
+
+    def require_interactive_auth(self,account,reason):
+        if reason not in ('need_manual_captcha','need_manual_mfa','login_rejected','daily_login_limit'):return
+        with self.db:self.db.execute('INSERT INTO auth_recovery VALUES(?,?,?) ON CONFLICT(account) DO NOTHING',(account,reason,time.time()))
+
+    def authentication_recovered(self,account,day):
+        """Only called after fresh, successful school identity verification."""
+        with self.db:
+            self.db.execute('DELETE FROM auth_recovery WHERE account=?',(account,))
+            self.db.execute('DELETE FROM logins WHERE account=? AND day=?',(account,day))
 
     def claim(self, account, day, submission=None):
         with self.db:

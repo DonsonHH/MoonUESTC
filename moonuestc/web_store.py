@@ -345,13 +345,18 @@ class WebStore:
             claim=state.db.execute('SELECT outcome FROM claims WHERE account=? AND day=?',
                                    (account_key(payload),now().date().isoformat())).fetchone()
             confirmed_today=bool(claim and claim[0]=='confirmed')
+            auth_reason=state.auth_requirement(account_key(payload))
         finally: state.close()
         variation=normalize_variation(payload.get('variation'))
         last=json.loads(row['last_result']) if row['last_result'] else None
         school_window=(last or {}).get('checkinWindow')
         try:target=planned_time(payload,row['run_at'],now().date().isoformat(),self.execution_window,school_window)
         except (ToolError,KeyError,ValueError):target=None
-        with self.db() as db:reservation=db.execute('SELECT minute FROM web_schedule_slots WHERE account_id=?',(row['id'],)).fetchone()
+        with self.db() as db:
+            reservation=db.execute('SELECT minute FROM web_schedule_slots WHERE account_id=?',(row['id'],)).fetchone()
+            verified=db.execute('SELECT verified_at FROM portal_bindings WHERE account_id=?',(row['id'],)).fetchone()
+        if not auth_reason and row['last_run_at'] and row['last_run_at']>=(verified[0] if verified else 0) and (last or {}).get('reason') in ('need_manual_captcha','need_manual_mfa','login_rejected','daily_login_limit'):
+            auth_reason=last['reason']
         if self.execution_window:target=slot_target(payload,now().date().isoformat(),reservation[0]) if reservation else None
         return {'id':row['id'],'owner_id':row['owner_id'],'owner_name':row['owner_name'],'owner_username':row['owner_username'],
                 'label':row['label'],'student_id':payload['student_id'],'enabled':bool(row['enabled']),
@@ -361,6 +366,7 @@ class WebStore:
                 'confirmed_today':confirmed_today,
                 'variation':variation,'planned_run_at':target,'location_open':self.location_open(payload),'execution_window':self.execution_window,
                 'schedule_slot':slot_description(reservation[0]) if reservation else None,
+                'school_auth_required':bool(auth_reason),'school_auth_reason':auth_reason,
                 'hosting_notice_accepted':self.notice_accepted({'id':row['owner_id'],'role':row['owner_role']}),'hosting_notice_required':self.require_notice,
                 'configuration_checked':bool(row['last_run_at'] and row['last_run_at']>=row['updated_at'] and (last or {}).get('result') in ('dry_run_ready','confirmed')),
                 'last_result':json.loads(row['last_result']) if row['last_result'] else None,

@@ -10,11 +10,12 @@ import threading
 import uuid
 import os
 import math
+import datetime as dt
 from pathlib import Path
 
 from .client import School
 from .errors import ToolError
-from .policy import validate_config
+from .policy import validate_config,SHANGHAI
 from .runner import cookie_path
 from .runner import account_key
 from .state import State,InteractiveAuthCooldown
@@ -235,6 +236,7 @@ class PortalAuth:
                     old_payload=self.store._payload(current)
                     # Keep the latest location/schedule if edited while school verification ran.
                     payload['location']=old_payload.get('location',payload['location'])
+                    payload['variation']=old_payload.get('variation',payload.get('variation'))
                     if cookie_path(self.store.directory,old_payload).name!=cookie_path(self.store.directory,payload).name:
                         db.execute('DELETE FROM web_cookies WHERE binding=?',(cookie_path(self.store.directory,old_payload).name,))
                     db.execute('UPDATE web_accounts SET owner_id=?,payload=?,updated_at=? WHERE id=?',
@@ -266,6 +268,10 @@ class PortalAuth:
                        (hashlib.sha256(token.encode()).hexdigest(),user['id'],csrf,stamp,stamp,stamp+43200))
             self.store._audit(db,user,'student_login',aid)
             result=public_user(db.execute('SELECT * FROM web_users WHERE id=?',(user['id'],)).fetchone())
+        if not cached:
+            state=State(self.store.directory)
+            try:state.authentication_recovered(account_key(payload),dt.datetime.fromtimestamp(stamp,SHANGHAI).date().isoformat())
+            finally:state.close()
         return token,csrf,result
 
     def identity(self,user):

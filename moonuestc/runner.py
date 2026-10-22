@@ -59,7 +59,8 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
     key = account_key(account)
     transport = transport_factory(account["user_agent"], cookie_path(directory, account))
     school = School(transport, account,
-                    budget=lambda: state.login_budget(key, clock().date().isoformat()), emit=emit)
+                    budget=lambda: state.login_budget(key, clock().date().isoformat()), emit=emit,
+                    before_login=lambda:state.check_unattended_login(key,clock().date().isoformat()))
     action='not_submitted'
     observations=[]
     original=None
@@ -170,5 +171,8 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
         emit('submission_result',submission=original)
         return finished(reconcile(school,state,key,day,clock,sleep,emit=emit,observations=observations))
 
+    except ToolError as error:
+        state.require_interactive_auth(key,error.reason)
+        raise
     finally:
         transport.save()

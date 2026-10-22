@@ -15,7 +15,7 @@ class Retrying(unittest.TestCase):
  def tearDown(self):self.tmp.cleanup()
  def test_one_delayed_retry_is_persistent_and_second_failure_is_terminal(self):
   calls=[]
-  def fail(*args,**kwargs):calls.append(True);raise ToolError('need_manual_mfa','cas_submit')
+  def fail(*args,**kwargs):calls.append(True);raise ToolError('timeout','today')
   worker=WebWorker(self.store,runner=fail)
   with patch('moonuestc.web_service.now',return_value=INSTANT),patch('moonuestc.web_store.time.time',return_value=INSTANT.timestamp()):worker.run_one()
   job=self.store.jobs(self.admin,self.job);self.assertEqual(job['state'],'queued');self.assertEqual(job['attempt'],1);self.assertGreaterEqual(job['available_at'],INSTANT.timestamp()+120)
@@ -23,7 +23,11 @@ class Retrying(unittest.TestCase):
   restored=WebStore(self.tmp.name,self.store.hasher);restored.execution_window=self.store.execution_window;worker=WebWorker(restored,runner=fail)
   later=INSTANT.fromtimestamp(job['available_at'],INSTANT.tzinfo)
   with patch('moonuestc.web_service.now',return_value=later),patch('moonuestc.web_store.time.time',return_value=later.timestamp()):worker.run_one()
-  job=restored.jobs(self.admin,self.job);self.assertEqual(job['state'],'failed');self.assertEqual(job['result']['reason'],'need_manual_mfa');self.assertTrue(job['result']['retryExhausted']);self.assertEqual(len(calls),2)
+  job=restored.jobs(self.admin,self.job);self.assertEqual(job['state'],'failed');self.assertEqual(job['result']['reason'],'timeout');self.assertTrue(job['result']['retryExhausted']);self.assertEqual(len(calls),2)
+ def test_captcha_is_owner_action_not_an_automatic_retry(self):
+  worker=WebWorker(self.store,runner=lambda *a,**kw:(_ for _ in ()).throw(ToolError('need_manual_captcha','cas_submit')))
+  with patch('moonuestc.web_service.now',return_value=INSTANT):worker.run_one()
+  job=self.store.jobs(self.admin,self.job);self.assertEqual(job['state'],'failed');self.assertEqual(job['attempt'],0);self.assertNotIn('retryAt',job['result'])
  def test_unknown_submission_retry_only_rechecks_no_second_post(self):
   from test_workflows import FakeTransport
   from moonuestc.runner import run_account

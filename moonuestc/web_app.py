@@ -300,6 +300,28 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
     @protected()
     def portal_me():return response_ok(portal.identity(g.moon_user))
 
+    @app.post('/api/portal/reauthenticate')
+    @protected()
+    def portal_reauthenticate():
+        if g.moon_user['role']!='user':raise WebError(403,'student_required','请由学生本人更新学校认证。')
+        value=body()
+        if set(value)-{'viewport'}:raise WebError(400,'invalid_fields','重新验证只接受当前账号，不接受其他学号或凭据。')
+        manager=app.extensions.get('moon_assisted')
+        if manager is None:raise WebError(503,'browser_unavailable','学校验证服务暂时不可用。')
+        with store.db() as db:
+            link=db.execute('SELECT account_id FROM portal_bindings WHERE user_id=?',(g.moon_user['id'],)).fetchone()
+            if not link:raise WebError(409,'school_verification_required','请重新登录并完成学校账号绑定。')
+            row=store._row(db,g.moon_user,link['account_id'])
+            if store._busy(db,row['id']):raise WebError(409,'account_busy','请等待当前任务结束后再更新学校认证。')
+            payload=store._payload(row)
+        from .notice import VERSION
+        data={'student_id':payload['student_id'],'password':payload['password'],'consent_version':VERSION}
+        if 'viewport' in value:data['viewport']=value['viewport']
+        token,csrf=manager.start(data,client_ip(),request.cookies.get('moon_school_onboarding'))
+        response=jsonify({'ok':True,'onboarding_csrf':csrf,'phase':manager.get(token).get('phase','verification')})
+        response.set_cookie('moon_school_onboarding',token,max_age=300,secure=secure,httponly=True,samesite='Strict',path='/api/onboarding')
+        return response
+
     @app.get('/api/portal/authorizations')
     @protected(admin=True)
     def portal_authorizations():return response_ok(portal.authorizations(g.moon_user))
