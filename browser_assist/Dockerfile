@@ -1,4 +1,5 @@
-FROM moonuestc-local:20261021-portal-r2
+ARG MOON_APP_IMAGE=moonuestc-local:student-portal
+FROM ${MOON_APP_IMAGE}
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends chromium fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/* \

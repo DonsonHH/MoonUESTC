@@ -26,6 +26,8 @@ docker build -t moonuestc-local:student-portal .
 docker build -t moonuestc-browser:local browser_assist
 ```
 
+辅助浏览器默认基于上一步构建的 `moonuestc-local:student-portal`；若主镜像使用其他标签，在辅助浏览器构建时传入 `--build-arg MOON_APP_IMAGE=实际主镜像标签`。
+
 3. 初始化管理员（交互输入，不保存明文初始化密码文件），再启动服务：
 
 ```sh
