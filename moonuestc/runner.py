@@ -10,6 +10,7 @@ from .errors import ToolError
 from .diagnostics import error_details,submission_details,verification_details
 from .policy import TERMINAL, build_payload, check_fence, location_configured, location_source, now, valid_today, verified, window
 from .transport import Transport
+from .daily_plan import normalize_variation,verify_circle
 
 
 def account_key(account):
@@ -63,6 +64,7 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
     observations=[]
     original=None
     prior_attempt=False
+    checked_window=None
     run_id=run_id or uuid.uuid4().hex
     def mark(value,day):
         nonlocal action,original,prior_attempt
@@ -74,6 +76,7 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
         observation=verification_details({'attempt':0,'at':instant.timestamp(),'status':data.get('recordStatusCode')})
         observations.append(observation);emit('verification',observation=observation)
     def finished(value):
+        if checked_window:value['checkinWindow']=checked_window
         if mode=='checkin':
             value['submissionAction']=action
             value['priorAttempt']=prior_attempt
@@ -107,13 +110,20 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
             return finished({"result": "already_recorded", "businessDate": day, "status": status})
         if state.claimed(key, day) and mode != "prepare":
             return recheck(day)
+        if account.get('_allowed_presets') and (account.get('location') or {}).get('preset') not in account['_allowed_presets']:raise ToolError('location_not_open','location')
         payload = build_payload(account, instant)
-        check_fence(payload, school.locations())
+        fences=school.locations()
+        check_fence(payload, fences)
+        variation=normalize_variation(account.get('variation'))
+        if variation['meters']:
+            base=build_payload({**account,'variation':{'minutes':0,'meters':0}},instant)
+            verify_circle(base['latitude'],base['longitude'],variation['meters'],fences)
         address = payload["reverseGeocode"]
         if not address:
             address = school.reverse_geocode(payload["latitude"], payload["longitude"])
         payload["reverseGeocode"] = address
         win = window(school.schedule(), clock())
+        checked_window=win
         if mode == "prepare":
             return {"result": "dry_run_ready", "businessDate": day, "checkinWindow": win,
                     "submitted": False, "alreadyRecorded": status in TERMINAL, "locationSource": location_source(account), **location_details(account)}
@@ -121,6 +131,8 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
             raise ToolError("invalid_mode", "local")
         if not win["open"]:
             raise ToolError("outside_checkin_window", "schedule")
+        bounds=account.get('_execution_window')
+        if bounds and not bounds[0]<=instant.strftime('%H:%M')<=bounds[1]:raise ToolError('outside_execution_window','schedule')
         # Refresh status and schedule just before the durable claim.
         fresh = school.today()
         instant = clock()
@@ -135,7 +147,10 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
         instant = clock()
         if instant.date().isoformat() != day:
             raise ToolError("business_date_changed", "checkin_post")
+        if account.get('_job_deadline') and instant.timestamp()>=account['_job_deadline']:raise ToolError('reserved_slot_expired','schedule')
+        if bounds and not bounds[0]<=instant.strftime('%H:%M')<=bounds[1]:raise ToolError('outside_execution_window','schedule')
         payload = build_payload(account, instant)
+        check_fence(payload, school.locations())
         payload["reverseGeocode"] = address
         initial={'attemptId':uuid.uuid4().hex,'originRun':run_id,'startedAt':clock().timestamp(),'outcome':'attempting'}
         if not state.claim(key, day, initial):

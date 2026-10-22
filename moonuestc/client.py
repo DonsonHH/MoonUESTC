@@ -56,7 +56,7 @@ def encrypt_password(password, salt):
 
 
 class School:
-    def __init__(self, transport, account, budget, emit=lambda *args: None):
+    def __init__(self, transport, account, budget, emit=lambda *args,**kwargs: None):
         self.transport, self.account, self.budget, self.emit = transport, account, budget, emit
         self.submission_response = None
 

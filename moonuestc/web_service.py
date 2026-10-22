@@ -1,5 +1,6 @@
 """One school-request worker for dashboard jobs and daily scheduling."""
 import threading
+import json
 import time
 
 from .errors import ToolError
@@ -9,6 +10,10 @@ from .runner import account_key,run_account
 from .state import State,execution_lock
 from .vault import EncryptedTransport
 from .web_errors import WebError
+from .daily_plan import planned_time
+from .scheduling import slot_target
+
+RETRY_REASONS={'need_manual_mfa','need_manual_captcha','login_rejected','session_rejected','portal_session_rejected','micro_app_unauthorized','timeout','network_error','connection_error','http_error','invalid_json','record_not_confirmed','worker_internal_error','dns_error','reserved_slot_expired'}
 
 
 class WebWorker:
@@ -24,15 +29,28 @@ class WebWorker:
         instant=now()
         minute=instant.hour*60+instant.minute
         day=instant.date().isoformat()
-        for row in self.store.automatic_accounts():
-            if minute<clock_minutes(row['run_at']): continue
+        self.store.ensure_slots()
+        for row in self.store.automatic_accounts(day):
             try:
                 payload=self.store.vault.open(row['payload'],'account:'+row['id'])
+                if not self.store.location_open(payload):continue
+                school_window=(json.loads(row['last_result']) if row.get('last_result') else {}).get('checkinWindow')
+                target=planned_time(payload,row['run_at'],day,self.store.execution_window,school_window)
+                if self.store.execution_window:
+                    if row['slot_minute'] is None:continue
+                    if instant.strftime('%H:%M:%S')<slot_target(payload,day,row['slot_minute']):continue
+                elif minute<clock_minutes(target):continue
+                if self.store.execution_window and minute>clock_minutes(self.store.execution_window[1]):continue
                 state=State(self.store.directory)
                 try: ready=state.ready(account_key(payload))
                 finally: state.close()
                 if not ready: continue
-                self.store.enqueue({'id':row['owner_id'],'role':'admin'},row['id'],'checkin','schedule',day)
+                start=end=0
+                if self.store.execution_window:
+                    base=instant.replace(hour=0,minute=0,second=0,microsecond=0)
+                    start=base.timestamp()+row['slot_minute']*60+int(slot_target(payload,day,row['slot_minute'])[-2:])
+                    end=base.timestamp()+row['slot_minute']*60+30
+                self.store.enqueue({'id':row['owner_id'],'role':'admin'},row['id'],'checkin','schedule',day,available_at=start,execute_before=end)
             except (WebError,ToolError):
                 continue
 
@@ -44,6 +62,9 @@ class WebWorker:
             self.store.record_job_event(job,'run_started',{})
             if job['business_date']!=now().date().isoformat():
                 raise ToolError('job_expired','worker')
+            if job['source']=='schedule' and self.store.execution_window and now().strftime('%H:%M')>self.store.execution_window[1]:
+                raise ToolError('schedule_deadline_missed','worker')
+            if job.get('execute_before') and now().timestamp()>=job['execute_before']:raise ToolError('reserved_slot_expired','worker')
             payload=self.store.job_payload(job)
             with execution_lock(self.store.directory):
                 state=State(self.store.directory)
@@ -60,6 +81,11 @@ class WebWorker:
             result={'result':'error','reason':error.code,'stage':'worker'}
         except Exception:
             result={'result':'error','reason':'worker_internal_error','stage':'worker'}
+        retryable=result.get('result')=='submission_unknown' or result.get('result')=='error' and result.get('reason') in RETRY_REASONS
+        if job['source']=='schedule' and retryable:
+            if not job.get('attempt',0) and self.store.defer_scheduled_retry(job,result,now().timestamp()):return True
+            if job.get('attempt',0):result['retryExhausted']=True
+            else:result['retryUnavailable']=True
         self.store.finish_job(job,result)
         return True
 
@@ -69,15 +95,18 @@ class WebWorker:
         def loop():
             while not self.stop_event.is_set():
                 try:
-                    self.schedule_once()
-                    if time.monotonic()>=self.next_job_at and self.run_one():
-                        self.next_job_at=time.monotonic()+self.gap_seconds
+                    self.tick()
                 except Exception:
                     # School secrets and raw exception messages never enter web logs.
                     pass
                 self.stop_event.wait(1)
         self.thread=threading.Thread(target=loop,name='moon-checkin-worker',daemon=True)
         self.thread.start()
+
+    def tick(self):
+        self.schedule_once()
+        if time.monotonic()>=self.next_job_at and self.run_one():
+            self.next_job_at=time.monotonic()+self.gap_seconds
 
     def stop(self):
         self.stop_event.set()

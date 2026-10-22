@@ -70,7 +70,7 @@ class GroupThreeUpgrade(WebCase):
         self.assertEqual(upgrade_group3_location(custom_address,migrate_named=True)['reverse_geocode'],'用户自填地址')
 
     def test_corrupt_second_payload_rolls_back_all_location_updates(self):
-        first=self.add_account(student='202300000001');second=self.add_account(student='202300000002')
+        first=self.add_account(student='202300000001');second=self.add_account(owner=2,student='202300000002')
         self.legacy_row(first,{'mode':'preset','preset':'xuezhi_group3'})
         self.legacy_row(second,{'mode':'preset','preset':'xuezhi_group3'})
         with self.store.db(True) as db:
@@ -79,7 +79,7 @@ class GroupThreeUpgrade(WebCase):
         with self.assertRaises(ToolError):WebStore(self.root,FAST_HASHER)
         with self.store.db() as db:
             self.assertEqual(before,[tuple(x) for x in db.execute('SELECT id,payload FROM web_accounts ORDER BY rowid')])
-            self.assertEqual(db.execute('SELECT count(*) FROM web_migrations').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT count(*) FROM web_migrations WHERE name=?',('group3_gcj02_v050',)).fetchone()[0],0)
             self.assertEqual(db.execute("SELECT count(*) FROM web_audit WHERE event='account_location_migrated'").fetchone()[0],0)
 
     def test_new_manual_location_keeps_explicit_coordinates_even_with_group_three_name(self):

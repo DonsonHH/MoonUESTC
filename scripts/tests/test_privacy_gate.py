@@ -289,7 +289,13 @@ class PrivacyTests(unittest.TestCase):
             marker=b"synthetic-live-canary-9613"
             protocol={"schema":1,"markers_b64":[base64.b64encode(marker).decode()],"read_only":True}
             (stub/"ssh").write_text("#!"+sys.executable+"\nimport sys\nsys.stdin.read()\nprint("+repr(json.dumps(protocol))+")\n");(stub/"ssh").chmod(0o755)
+            executable=stub/'ssh'
+            if sys.platform=='win32':
+                (stub/'stub-ssh.py').write_text('import sys\nsys.stdin.read()\nprint('+repr(json.dumps(protocol))+')\n')
+                executable=stub/'ssh.cmd'
+                executable.write_text('@echo off\n"'+sys.executable+'" "'+str(stub/'stub-ssh.py')+'"\n')
             for k,v in [("core.hooksPath",".githooks"),("moonuestc.privacyPython",sys.executable),("moonuestc.privacyHost","fixture"),("moonuestc.privacyContainer","fixture")]:self.git(repo,"config",k,v)
+            self.git(repo,'config','moonuestc.privacySSH',str(executable))
             self.git(repo,"remote","add","origin",str(remote));self.git(repo,"add",".");self.git(repo,"commit","-qm","clean")
             env=os.environ.copy();env["PATH"]=str(stub)+os.pathsep+env["PATH"];env["PYTHONDONTWRITEBYTECODE"]="1"
             clean=subprocess.run(["git","-C",str(repo),"push","origin","HEAD:refs/heads/main"],capture_output=True,text=True,env=env)

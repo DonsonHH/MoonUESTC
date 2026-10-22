@@ -19,3 +19,7 @@ __pycache__/
 # Private deployment records do not belong in the public repository.
 SHANGHAI-*
 AGENTS.md
+node_modules/
+frontend/node_modules/
+frontend/.vite/
+deploy/admin-ssh.config

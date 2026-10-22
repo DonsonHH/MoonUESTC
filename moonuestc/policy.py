@@ -5,6 +5,7 @@ import re
 from .errors import ToolError
 from .coordinates import to_gcj02
 from .locations import resolve_location
+from .daily_plan import normalize_variation,position_for
 
 SHANGHAI = dt.timezone(dt.timedelta(hours=8), "Asia/Shanghai")
 TERMINAL = {"CHECKED_IN", "STUDENT_REPORTED", "INSTRUCTOR_REPORTED", "EXEMPT"}
@@ -100,6 +101,7 @@ def validate_config(config):
         if not isinstance(ua, str) or ua.startswith("PUT_") or not 15 <= len(ua) <= 1024 or "\r" in ua or "\n" in ua:
             raise ToolError("user_agent_missing", "config")
         location_source(account)
+        normalize_variation(account.get('variation'))
     return config
 
 
@@ -160,6 +162,7 @@ def build_payload(account, instant):
         payload["coordinateSystemCode"] = "gcj02"
     if payload["coordinateSystemCode"] != "gcj02":
         raise ToolError("coordinate_system_mismatch", "location")
+    payload['latitude'],payload['longitude']=position_for(account,instant.date().isoformat(),payload['latitude'],payload['longitude'])
     accuracy, duration = payload["accuracy"], payload["locationDurationMs"]
     if not number(accuracy) or accuracy < 0:
         raise ToolError("invalid_request_metadata", "location")

@@ -1,6 +1,6 @@
 # Third-party acknowledgements and licenses
 
-MoonUESTC is independently written integration and dashboard code, distributed under the MIT license in LICENSE.
+This distribution includes MoonUESTC integration and dashboard code from https://github.com/horoscope963852/MoonUESTC (MIT) and Donson's student portal, browser helper, private operator access and queue changes. The original copyright and permission notice remain in LICENSE. The initial imported upstream snapshot was commit 69ebe71; the current local repository starts from an imported source snapshot rather than the complete upstream Git history.
 
 ## Referenced projects
 
@@ -28,3 +28,6 @@ The eight named campus presets use maintainer-provided AMap GCJ-02 coordinates. 
 ## ALTCHA registration verification
 
 ALTCHA widget 3.4.1 is bundled locally from https://registry.npmjs.org/altcha/-/altcha-3.4.1.tgz under MIT. Its external CSS/worker build keeps resources on the instance origin; see third_party/ALTCHA.LICENSE and ALTCHA-SOURCE.json for license and exact source hashes. Official altcha Python library 2.3.0 is pinned in requirements.txt and its wheel includes its applicable license metadata. No ALTCHA Cloud or Sentinel service is called. The browser must support Web Crypto in a secure context (HTTPS or localhost).
+# Donson UI additions
+
+The Donson frontend uses React, Radix Primitives, Sonner, Lucide and morphdom 2.7.8 (MIT), plus their runtime dependencies. Bundled license texts are retained under `third_party/ui/`. The frontend lockfile pins exact package versions.

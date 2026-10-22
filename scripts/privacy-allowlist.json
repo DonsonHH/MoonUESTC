@@ -1364,6 +1364,307 @@
       "path": "wheelhouse/pycryptodome-3.23.0-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl!/Crypto/SelfTest/Signature/test_pss.py",
       "match_sha256": "2506a81d0e94e94bd8acae1405e1fd193e8a9092a74a2585bad361eeaec4cf93",
       "reason": "Reviewed upstream library self-test key, documented example or compiler/build metadata from the audited official base and pinned wheels."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "browser_assist/tests/test_navigation.py",
+      "match_sha256": "b7afd8af890c0e23d27cc76c176171bc80b1f828ee294dfcc4b92aa53ae23a0b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "browser_assist/tests/test_navigation.py",
+      "match_sha256": "78120abcbbdc37bbbf148a1fe6d1faddbc71aba382504f4c369e1deb89f2a180",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "moonuestc/assisted_auth.py",
+      "match_sha256": "6cbb7b990020562efb4a2408f08aa2d3df984d73c5c8a0d40b2db761a5a1ce67",
+      "reason": "Reviewed public cookie NAME or Authorization scheme prefix; the authenticated value is supplied at runtime, not in source."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "moonuestc/assisted_auth.py",
+      "match_sha256": "56ad904a98b32c86bbb137cbb72fef4db8ba81b6381fa46848d910510d709119",
+      "reason": "Reviewed public cookie NAME or Authorization scheme prefix; the authenticated value is supplied at runtime, not in source."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_assisted_auth.py",
+      "match_sha256": "618d08af62fd104fdb9e4489addaf4ee5bb0232c2be8ee24875a467396fdfe50",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_assisted_auth.py",
+      "match_sha256": "b7afd8af890c0e23d27cc76c176171bc80b1f828ee294dfcc4b92aa53ae23a0b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_assisted_auth.py",
+      "match_sha256": "18702bc66518f267ed08cf5d8d9cf919bf440addfa4d64cd68094a2b16527270",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_assisted_auth.py",
+      "match_sha256": "44bf0c0e55293dc2fc0446d9353d1ddd732a2371ed044af08db1856ac697f58b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_assisted_auth.py",
+      "match_sha256": "181937129446268a8bb56f7b2c6312250e73dc1efb27f5bd4a3d78d2e3f4ee41",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_environment",
+      "path": "tests/test_assisted_auth.py",
+      "match_sha256": "2b0f10567b03de1c31fa513be64c4d901ed2f45480da9e1e6153dc9ff65999cf",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_environment",
+      "path": "tests/test_assisted_auth.py",
+      "match_sha256": "514bd02bf823a356635b8c0871395149c5052d1961e039b3249f41471c7d4198",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_auth_budget.py",
+      "match_sha256": "b7afd8af890c0e23d27cc76c176171bc80b1f828ee294dfcc4b92aa53ae23a0b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_daily_plan.py",
+      "match_sha256": "50f052477a1887b34b22fc5564ff1a92b1b85e2680b88ac1e4566c972a0b57bf",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_hosting_notice.py",
+      "match_sha256": "b7afd8af890c0e23d27cc76c176171bc80b1f828ee294dfcc4b92aa53ae23a0b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_management_routes.py",
+      "match_sha256": "d1bb93d9ffac054939671c3b2938133937ec2d41cb83415e37539854aacdd092",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_management_routes.py",
+      "match_sha256": "18702bc66518f267ed08cf5d8d9cf919bf440addfa4d64cd68094a2b16527270",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_management_routes.py",
+      "match_sha256": "45f9041f51775c1cbc8c5cfe5588b92239f119dba6653237613b60bd465c108f",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_management_routes.py",
+      "match_sha256": "b7afd8af890c0e23d27cc76c176171bc80b1f828ee294dfcc4b92aa53ae23a0b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_management_routes.py",
+      "match_sha256": "f5d34e958714cddb12fe4f255f04580b5863bded2296bde773a986e056661db1",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_environment",
+      "path": "tests/test_management_routes.py",
+      "match_sha256": "811980bc7147d2b02f289731c61b937a1c89bdd335e98501012770f9e9906298",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_portal.py",
+      "match_sha256": "18702bc66518f267ed08cf5d8d9cf919bf440addfa4d64cd68094a2b16527270",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_portal.py",
+      "match_sha256": "45f9041f51775c1cbc8c5cfe5588b92239f119dba6653237613b60bd465c108f",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_portal.py",
+      "match_sha256": "181937129446268a8bb56f7b2c6312250e73dc1efb27f5bd4a3d78d2e3f4ee41",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_portal.py",
+      "match_sha256": "07010d05777efaab70ebd8508bf354674baa9d4482cb25322e7ad96657a3218e",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_portal.py",
+      "match_sha256": "1f08941a781dae2ba62ff47e8630d07a8c1e36164c6f650081f345a8f34d7e1a",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_portal.py",
+      "match_sha256": "b7afd8af890c0e23d27cc76c176171bc80b1f828ee294dfcc4b92aa53ae23a0b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_portal.py",
+      "match_sha256": "ba57e11ea5ac004dda62dab07abb9c8e3f48df73b78ae17878d6263de971cbda",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_portal.py",
+      "match_sha256": "0f3ed3125f37febd83505421b85614dd417fc7cf50e42c38077ec2b43966d111",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_environment",
+      "path": "tests/test_portal.py",
+      "match_sha256": "3d76fc3be848d7958e16ac0716de7ec6aa83ad14420fd3850fe9a3173f3eedc9",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_environment",
+      "path": "tests/test_portal.py",
+      "match_sha256": "514bd02bf823a356635b8c0871395149c5052d1961e039b3249f41471c7d4198",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_private_surfaces.py",
+      "match_sha256": "fa31ace2219ceea9d38b3263ead679cbada33650e0ec77949fa7c6ab44a2471f",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_private_surfaces.py",
+      "match_sha256": "18702bc66518f267ed08cf5d8d9cf919bf440addfa4d64cd68094a2b16527270",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_private_surfaces.py",
+      "match_sha256": "b7afd8af890c0e23d27cc76c176171bc80b1f828ee294dfcc4b92aa53ae23a0b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_private_surfaces.py",
+      "match_sha256": "f62b721a499c0459965b28d4081ecc641482ad3e119395701fd2f35544974a69",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_private_surfaces.py",
+      "match_sha256": "b2b0344f1a20745081c8c3d1be3b5e0d7f4c7f714d1bc5ddf3fc7de9eddf1dc1",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_private_surfaces.py",
+      "match_sha256": "f7d9549370ee77f09a63982c327cc00711e6510d5f6b3bc8cbe28ac04e3348f9",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_reserved_slots.py",
+      "match_sha256": "b07efcdeb1a82e583eac18fed6aeb1a215b573ecdfa3ac1acbd97cfea34e6e15",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_reserved_slots.py",
+      "match_sha256": "b8c3bcfbf08d66191a2d0f996f686727ee202e5ff67def3b4969f9b082967f15",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_schedule_capacity.py",
+      "match_sha256": "18702bc66518f267ed08cf5d8d9cf919bf440addfa4d64cd68094a2b16527270",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_schedule_capacity.py",
+      "match_sha256": "1dd0ee210491c60ed5c510b39c546481f21bc3d2c05a5f8d8dc556134ea8d7d3",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_scheduled_retry.py",
+      "match_sha256": "b07efcdeb1a82e583eac18fed6aeb1a215b573ecdfa3ac1acbd97cfea34e6e15",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_scheduled_retry.py",
+      "match_sha256": "b8c3bcfbf08d66191a2d0f996f686727ee202e5ff67def3b4969f9b082967f15",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_school_profile.py",
+      "match_sha256": "b7afd8af890c0e23d27cc76c176171bc80b1f828ee294dfcc4b92aa53ae23a0b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_student_authorizations.py",
+      "match_sha256": "18702bc66518f267ed08cf5d8d9cf919bf440addfa4d64cd68094a2b16527270",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_student_authorizations.py",
+      "match_sha256": "44bf0c0e55293dc2fc0446d9353d1ddd732a2371ed044af08db1856ac697f58b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_student_names.py",
+      "match_sha256": "27025c3fdb1c2fd8b379af5f7a7d8c4287787d492cdc924fa204d7b2df6759fa",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_student_scope.py",
+      "match_sha256": "7951492c7f26a98ad5e10ee10af5a6326be4e8a3806e6dd6983981167626e8de",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_student_scope.py",
+      "match_sha256": "b7afd8af890c0e23d27cc76c176171bc80b1f828ee294dfcc4b92aa53ae23a0b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_student_scope.py",
+      "match_sha256": "18702bc66518f267ed08cf5d8d9cf919bf440addfa4d64cd68094a2b16527270",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_student_scope.py",
+      "match_sha256": "44bf0c0e55293dc2fc0446d9353d1ddd732a2371ed044af08db1856ac697f58b",
+      "reason": "Reviewed synthetic offline test input/fixture. No real school request or deployed credential; live private markers remain unwaivable."
     }
-  ]
+  ],
+  "reviewed_donson_feature_version": "0.5.1+donson.13"
 }

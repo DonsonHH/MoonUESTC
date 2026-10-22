@@ -31,14 +31,18 @@ def collect():
         add(raw)
         cipher=AES.new(key,AES.MODE_GCM,nonce=raw[3:15]);cipher.update(purpose.encode())
         return json.loads(cipher.decrypt_and_verify(raw[31:],raw[15:31]))
-    users=list(db.execute("SELECT username,display_name,password_hash FROM web_users"))
-    for username,display,password_hash in users:
+    users=list(db.execute("SELECT username,display_name,password_hash,role FROM web_users"))
+    for username,display,password_hash,role in users:
         add(password_hash)
+        if role=='user':add(username);add(display)
     accounts=list(db.execute("SELECT id,payload FROM web_accounts"))
     for aid,payload in accounts:
         account=opened(payload,"account:"+aid)
-        for field in ["student_id","password","browser_fingerprint"]:
+        for field in ["student_id","password","browser_fingerprint","browser_profile","variation_seed"]:
             add(account.get(field))
+    if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='portal_access_grants'").fetchone():
+        for digest,payload in db.execute('SELECT student_digest,payload FROM portal_access_grants'):
+            add(opened(payload,'portal_access:'+digest).get('student_id'))
     cookies=list(db.execute("SELECT binding,payload FROM web_cookies"))
     for binding,payload in cookies:
         for cookie in opened(payload,"cookie:"+binding):

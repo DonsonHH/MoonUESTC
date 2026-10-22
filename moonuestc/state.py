@@ -3,10 +3,19 @@ import contextlib
 import os
 import json
 import sqlite3
+import hashlib
+import secrets
+import time
+import math
 from pathlib import Path
 
 from .errors import ToolError
 from .diagnostics import submission_details
+
+class InteractiveAuthCooldown(ToolError):
+    def __init__(self,retry_after):
+        super().__init__('interactive_auth_cooldown','local_auth_guard')
+        self.retry_after=max(1,int(retry_after))
 
 
 @contextlib.contextmanager
@@ -64,7 +73,39 @@ class State:
             CREATE TABLE IF NOT EXISTS daily (
                 account TEXT, day TEXT, result TEXT NOT NULL,
                 PRIMARY KEY (account, day));
+            CREATE TABLE IF NOT EXISTS interactive_auth_flows (
+                token_hash TEXT PRIMARY KEY,account TEXT NOT NULL,started_at REAL NOT NULL,
+                completed INTEGER NOT NULL DEFAULT 0);
+            CREATE INDEX IF NOT EXISTS interactive_auth_account_time ON interactive_auth_flows(account,started_at);
         """)
+
+    def begin_interactive_login(self,account):
+        """One owner-operated flow per permit, including its final identity check.
+
+        This rolling local guard is deliberately separate from the historical
+        unattended three-per-day password retry guard in logins.
+        """
+        stamp=time.time();token=secrets.token_urlsafe(32)
+        with self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            self.db.execute('DELETE FROM interactive_auth_flows WHERE started_at<=?',(stamp-86400,))
+            rows=self.db.execute('SELECT started_at FROM interactive_auth_flows WHERE account=? AND started_at>? ORDER BY started_at',(account,stamp-300)).fetchall()
+            if len(rows)>=10:raise InteractiveAuthCooldown(math.ceil(rows[0][0]+300-stamp))
+            self.db.execute('INSERT INTO interactive_auth_flows VALUES(?,?,?,0)',(hashlib.sha256(token.encode()).hexdigest(),account,stamp))
+        return token
+
+    def complete_interactive_login(self,token,account):
+        """A private permit can authorize the final check only once, for its ID."""
+        with self.db:
+            changed=self.db.execute('UPDATE interactive_auth_flows SET completed=1 WHERE token_hash=? AND account=? AND completed=0 AND started_at>?',
+                (hashlib.sha256(token.encode()).hexdigest(),account,time.time()-900)).rowcount
+            if changed!=1:raise ToolError('interactive_flow_invalid','local_auth_guard')
+
+    def release_unsubmitted_login(self,token,account):
+        # Only caller-proven, never-submitted browser preparations are refunded.
+        with self.db:
+            self.db.execute('DELETE FROM interactive_auth_flows WHERE token_hash=? AND account=? AND completed=0',
+                (hashlib.sha256(token.encode()).hexdigest(),account))
 
     def login_budget(self, account, day):
         with self.db:

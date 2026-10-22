@@ -198,6 +198,6 @@ class DashboardRegistration(WebCase):
         self.assertEqual(response['default_preset_id'],'xuezhi_group3_amap')
         self.assertNotIn('legacy_locations',response)
         for reference in ('xuezhi_group3','学知三组团'):
-            account=self.add_account(student='202300000001' if reference=='xuezhi_group3' else '202300000008',location={'mode':'preset','preset':reference})
+            account=self.add_account(owner=1 if reference=='xuezhi_group3' else 2,student='202300000001' if reference=='xuezhi_group3' else '202300000008',location={'mode':'preset','preset':reference})
             self.assertEqual(account['location'],{'mode':'preset','preset':'xuezhi_group3_amap'})
             self.assertEqual(account['inputCoordinateSystem'],'gcj02')
