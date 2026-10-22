@@ -509,19 +509,30 @@ class WebStore:
             self._audit(db,actor,'job_queued',jid)
         return jid
 
-    def jobs(self,actor,job_id=None):
+    def jobs(self,actor,job_id=None,*,since=None,before=None,limit=100):
         sql="SELECT j.*,a.label,a.owner_id,u.display_name AS owner_name,d.payload AS diagnostic_payload,(SELECT count(*) FROM web_jobs q WHERE q.state IN ('queued','running') AND (max(q.available_at,q.created_at)<max(j.available_at,j.created_at) OR (max(q.available_at,q.created_at)=max(j.available_at,j.created_at) AND q.id<=j.id))) AS queue_position FROM web_jobs j JOIN web_accounts a ON a.id=j.account_id JOIN web_users u ON u.id=a.owner_id LEFT JOIN web_job_diagnostics d ON d.job_id=j.id"
         where=[]; params=[]
         if actor['role']!='admin': where.append('a.owner_id=?'); params.append(actor['id'])
         if job_id: where.append('j.id=?'); params.append(job_id)
+        if since is not None:where.append('j.created_at>=?');params.append(since)
+        if before is not None:
+            where.append('(j.created_at<? OR (j.created_at=? AND j.id<?))');params.extend((before[0],before[0],before[1]))
         if where: sql+=' WHERE '+' AND '.join(where)
-        with self.db() as db: rows=db.execute(sql+' ORDER BY j.created_at DESC LIMIT 100',params).fetchall()
+        with self.db() as db: rows=db.execute(sql+' ORDER BY j.created_at DESC,j.id DESC LIMIT ?',params+[limit]).fetchall()
         result=[]
         for r in rows:
             result.append({key:r[key] for key in ('id','account_id','label','owner_name','mode','source','business_date','state','created_at','started_at','finished_at','attempt','available_at','execute_before')} |
                           {'queue_position':r['queue_position'] if r['state']=='queued' else None,'result':json.loads(r['result']) if r['result'] else None,'diagnostics':json.loads(r['diagnostic_payload']) if r['diagnostic_payload'] else None})
         if job_id and not result: raise WebError(404,'not_found','任务不存在。')
         return result[0] if job_id else result
+
+    def job_history(self,actor,cursor=None):
+        from .job_history import PAGE_SIZE,recent_start,encode_cursor,decode_cursor
+        cutoff=recent_start(now());before=decode_cursor(cursor) if cursor is not None else None
+        rows=self.jobs(actor,since=cutoff if before is None else None,before=before,limit=PAGE_SIZE)
+        boundary=(rows[-1]['created_at'],rows[-1]['id']) if rows else before or (cutoff,'')
+        more=bool(self.jobs(actor,before=boundary,limit=1))
+        return {'jobs':rows,'next_cursor':encode_cursor(*boundary) if more else None,'recent_since':cutoff}
 
     def record_job_event(self,job,event,values,account=None):
         if event not in ('run_started','submission_action','submission_result','verification','run_error'):return

@@ -399,6 +399,12 @@ def create_app(directory,public_url,*,allow_http=False,start_worker=False,runner
     @protected()
     def jobs(): return response_ok({'jobs':store.jobs(g.moon_user)})
 
+    @app.get('/api/jobs/history')
+    @protected()
+    def job_history():
+        if set(request.args)-{'cursor'} or len(request.args.getlist('cursor'))>1:raise WebError(400,'invalid_fields','运行记录查询参数不正确。')
+        return response_ok(store.job_history(g.moon_user,request.args.get('cursor')))
+
     @app.get('/api/jobs/<job_id>')
     @protected()
     def job(job_id): return response_ok({'job':store.jobs(g.moon_user,job_id)})

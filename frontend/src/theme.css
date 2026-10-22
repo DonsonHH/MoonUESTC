@@ -1,0 +1,44 @@
+:root{color-scheme:light;--on-accent:#fff;--switch-knob:#fff;--text:#20212b;--background:#f6f6f9;--surface:#fff;--accent:#6050cf;--accent-hover:#5140bd;
+--line:#e5e5ed;--line-strong:#aaa6bf;--muted:#606170;--focus:#a79de9;--link:#5143b6;--link-hover:#30207e;
+--soft:#f0ecfb;--soft-line:#dfd8ef;--soft-text:#66518e;--subtle:#f8f7fb;--code:#f0edf8;--sidebar:#fbfbfd;--nav-count:#d8cef5;
+--danger-text:#9a3324;--danger-bg:#fff4f0;--danger-line:#efc8c1;--danger:#b43b2c;
+--success-text:#27704e;--success-bg:#f0faf5;--success-line:#d2e9de;
+--warning-text:#90601f;--warning-bg:#fffaed;--warning-line:#efd9ac;--violet-text:#6546b5;--violet-bg:#f5f0ff;--violet-line:#ddd4f4;
+--overlay:#16132666;--header:#ffffffd9;--veil:#ffffffed;--switch:#c3c3d0;
+--moon-fill:#c6bff1;--moon-shade:#6956cf;--decoration:#8577e0;--hero-start:#f0ecff;--hero-end:#f9f7ff;--shadow:#30234a18;}
+:root[data-theme="dark"]{color-scheme:dark;--text:#eeedf5;--background:#131319;--surface:#1c1c25;--accent:#7560d4;--accent-hover:#6751c5;
+--line:#373541;--line-strong:#716a87;--muted:#b5afc2;--focus:#b5a5ff;--link:#c0afff;--link-hover:#ddd2ff;
+--soft:#30283f;--soft-line:#4d405f;--soft-text:#c1abd9;--subtle:#23222d;--code:#332a46;--sidebar:#191820;--nav-count:#49365f;
+--danger-text:#f2b0a8;--danger-bg:#372326;--danger-line:#74433e;--danger:#b43b2c;
+--success-text:#96d8b5;--success-bg:#1b3027;--success-line:#3c6652;
+--warning-text:#edc88c;--warning-bg:#33291e;--warning-line:#6e5735;--violet-text:#c5b0f4;--violet-bg:#30263f;--violet-line:#594275;
+--overlay:#050509b8;--header:#191820ed;--veil:#1c1c25ed;--switch:#5e586d;
+--moon-fill:#625779;--moon-shade:#ad98e7;--decoration:#a18bdc;--hero-start:#30263f;--hero-end:#211d2b;--shadow:#00000040;}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]):not([data-theme="dark"]){color-scheme:dark;--text:#eeedf5;--background:#131319;--surface:#1c1c25;--accent:#7560d4;--accent-hover:#6751c5;
+--line:#373541;--line-strong:#716a87;--muted:#b5afc2;--focus:#b5a5ff;--link:#c0afff;--link-hover:#ddd2ff;
+--soft:#30283f;--soft-line:#4d405f;--soft-text:#c1abd9;--subtle:#23222d;--code:#332a46;--sidebar:#191820;--nav-count:#49365f;
+--danger-text:#f2b0a8;--danger-bg:#372326;--danger-line:#74433e;--danger:#b43b2c;
+--success-text:#96d8b5;--success-bg:#1b3027;--success-line:#3c6652;
+--warning-text:#edc88c;--warning-bg:#33291e;--warning-line:#6e5735;--violet-text:#c5b0f4;--violet-bg:#30263f;--violet-line:#594275;
+--overlay:#050509b8;--header:#191820ed;--veil:#1c1c25ed;--switch:#5e586d;
+--moon-fill:#625779;--moon-shade:#ad98e7;--decoration:#a18bdc;--hero-start:#30263f;--hero-end:#211d2b;--shadow:#00000040;}}
+
+html{min-height:100%;scrollbar-color:var(--line-strong) var(--background)}
+body{background:var(--background);color:var(--text)}
+::selection{background:var(--soft-line);color:var(--text)}
+.theme-picker{display:inline-flex;flex-direction:row;align-items:center;gap:5px;color:var(--muted);font-weight:400;flex-shrink:0}
+.theme-picker select{width:auto;min-height:36px;max-width:130px;padding:6px 24px 6px 7px;border-color:transparent;background-color:transparent;color:var(--muted);font-size:13px;cursor:pointer}
+.theme-picker select:hover{background:var(--subtle);border-color:var(--line)}
+.theme-picker option{color:var(--text);background:var(--surface)}
+.history-caption{margin-top:6px;color:var(--muted);font-size:13px;line-height:1.5}
+.history-more{display:flex;align-items:center;justify-content:center;padding:18px 20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+.history-more .button{min-width:176px}
+.history-error{margin:18px;align-items:center;flex-wrap:wrap}
+.history-error .text-link{margin-left:auto}
+.history-empty{padding:40px 20px}
+/* School content stays in its original light document; app chrome follows the selected appearance. */
+.original-frame{color-scheme:light}
+@media(max-width:620px){.topbar-actions{gap:7px}.topbar-actions .pill{display:none}.theme-picker{gap:2px}.theme-picker select{font-size:12px;max-width:110px;padding-left:4px}.login-top{gap:12px}.history-more .button{width:100%}}
+
+/* Palette changes apply together, keeping button text readable during appearance switches. */
+.button{transition:transform .1s}
