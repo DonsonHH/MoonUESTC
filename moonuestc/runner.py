@@ -6,11 +6,12 @@ from pathlib import Path
 
 from .client import School
 from .locations import location_details
-from .errors import ToolError
+from .errors import AuthRequired, ToolError
 from .diagnostics import error_details,submission_details,verification_details
 from .policy import TERMINAL, build_payload, check_fence, location_configured, location_source, now, valid_today, verified, window
 from .transport import Transport
 from .daily_plan import normalize_variation,verify_circle
+from .school_policy import SCHOOL_CLIENT_REASON, SCHOOL_CLIENT_MESSAGE, submission_rejection
 
 
 def account_key(account):
@@ -43,6 +44,10 @@ def reconcile(school, state, key, day, clock, sleep, *, emit=lambda *args,**kwar
                 return {"result": "confirmed", "businessDate": day, "status": "CHECKED_IN", "abnormalFlag": False}
             if status in TERMINAL:
                 return {"result": "record_changed", "businessDate": day, "status": status}
+            rejected=submission_rejection(state.submission(key,day))
+            if rejected:
+                state.outcome(key,day,'rejected')
+                return {**rejected,'businessDate':day}
         except ToolError as error:
             observation=verification_details({'attempt':attempt+1,'at':clock().timestamp(),**error_details(error,school.account)},school.account)
             if observations is not None:observations.append(observation)
@@ -50,6 +55,10 @@ def reconcile(school, state, key, day, clock, sleep, *, emit=lambda *args,**kwar
             last_reason = error.reason
             if error.reason in ("abnormal_record", "business_date_mismatch", "business_date_changed"):
                 break
+    rejected=submission_rejection(state.submission(key,day))
+    if rejected:
+        state.outcome(key,day,'rejected')
+        return {**rejected,'businessDate':day,'verificationReason':last_reason}
     state.outcome(key, day, "unknown")
     return {"result": "submission_unknown", "businessDate": day, "reason": last_reason}
 
@@ -87,8 +96,21 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
     def recheck(day):
         mark('recheck',day)
         return finished(reconcile(school,state,key,day,clock,sleep,emit=emit,observations=observations))
+    def school_client_result(*,sync_login_required=False):
+        day=clock().date().isoformat()
+        if action=='not_submitted' and state.claimed(key,day):mark('recheck',day)
+        return finished({'result':'error','reason':'school_sync_login_required' if sync_login_required else SCHOOL_CLIENT_REASON,
+                         'stage':'checkin_authorization','businessDate':day,
+                         'schoolMessage':'请重新验证学校登录后再同步记录；签到仍须在微信「成电智慧学工」小程序内完成。' if sync_login_required else SCHOOL_CLIENT_MESSAGE})
     try:
-        data = school.connect()
+        restricted=mode=='checkin' and state.school_client_requirement()
+        if restricted:
+            # This action now synchronizes official records only. Never refresh
+            # passwords, manufacture an entry ticket, or submit a check-in.
+            if not transport.has_session():return school_client_result(sync_login_required=True)
+            try:data=school.enter()
+            except AuthRequired:return school_client_result(sync_login_required=True)
+        else:data = school.connect()
         instant = clock()
         day = instant.date().isoformat()
         status = valid_today(data, instant)
@@ -111,6 +133,7 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
             return finished({"result": "already_recorded", "businessDate": day, "status": status})
         if state.claimed(key, day) and mode != "prepare":
             return recheck(day)
+        if restricted:return school_client_result()
         if account.get('_allowed_presets') and (account.get('location') or {}).get('preset') not in account['_allowed_presets']:raise ToolError('location_not_open','location')
         payload = build_payload(account, instant)
         fences=school.locations()
@@ -153,6 +176,7 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
         payload = build_payload(account, instant)
         check_fence(payload, school.locations())
         payload["reverseGeocode"] = address
+        if state.school_client_requirement():return school_client_result()
         initial={'attemptId':uuid.uuid4().hex,'originRun':run_id,'startedAt':clock().timestamp(),'outcome':'attempting'}
         if not state.claim(key, day, initial):
             return recheck(day)
@@ -162,7 +186,7 @@ def run_account(account, mode, state, directory, *, clock=now, sleep=time.sleep,
             school.submit(payload)
         except ToolError as error:
             # Preserve the original error before any reconciliation can replace it.
-            outcome='rejected' if error.reason in ('business_error','session_rejected') else 'error' if error.reason in ('http_error','invalid_json','api_contract_changed') else 'unknown'
+            outcome='rejected' if error.reason in ('business_error','session_rejected',SCHOOL_CLIENT_REASON) else 'error' if error.reason in ('http_error','invalid_json','api_contract_changed') else 'unknown'
             details={**initial,**(school.submission_response or {}),**error_details(error,account),'outcome':outcome,'finishedAt':clock().timestamp()}
         else:
             details={**initial,**(school.submission_response or {}),'outcome':'accepted','finishedAt':clock().timestamp()}

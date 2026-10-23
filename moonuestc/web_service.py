@@ -26,6 +26,10 @@ class WebWorker:
         self.next_job_at=0
 
     def schedule_once(self):
+        state=State(self.store.directory)
+        try:
+            if state.school_client_requirement():return
+        finally:state.close()
         instant=now()
         minute=instant.hour*60+instant.minute
         day=instant.date().isoformat()

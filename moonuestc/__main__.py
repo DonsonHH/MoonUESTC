@@ -19,7 +19,7 @@ from .runner import account_key, run_account
 from .state import State, execution_lock
 
 SUCCESS = {"auth_ready", "dry_run_ready", "confirmed", "already_recorded"}
-SAFE_RESULTS = SUCCESS | {"submission_unknown", "record_changed", "error", "skipped"}
+SAFE_RESULTS = SUCCESS | {"submission_unknown", "submission_rejected", "record_changed", "error", "skipped"}
 
 
 def emit(event, **values):

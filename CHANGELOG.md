@@ -1,5 +1,11 @@
 # 更新记录
 
+## 0.5.1+donson.17
+
+- Identify school mini-program operation authorization errors (46001/46002/46003) separately from password verification and uncertain delivery.
+- Suspend unsupported submissions across accounts, restarts and days; retain existing plans and no-repeat claims. Official completion can be synchronized using read-only school records.
+- Explain existing rejected submissions without rewriting historical jobs. Both dashboards show the official entry requirement, and expired read sessions prompt owner verification without unattended credential retries.
+
 ## 0.5.1+donson.16
 
 - 重整首次使用、等待计划、今日完成和异常恢复的首页流程。

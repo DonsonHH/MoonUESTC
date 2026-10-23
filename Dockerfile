@@ -15,7 +15,7 @@ RUN python -m unittest discover -s tests -v \
     && chown 10001:10001 /data
 ARG VCS_REF=unreleased
 LABEL org.opencontainers.image.title="MoonUESTC Donson Portal" \
-      org.opencontainers.image.version="0.5.1+donson.16" \
+      org.opencontainers.image.version="0.5.1+donson.17" \
       org.opencontainers.image.source="https://github.com/DonsonHH/MoonUESTC" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.licenses="MIT"

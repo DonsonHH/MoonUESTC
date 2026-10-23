@@ -8,6 +8,7 @@ from html.parser import HTMLParser
 
 from .errors import AuthRequired, ToolError
 from .diagnostics import school_message
+from .school_policy import SCHOOL_CLIENT_CODES, SCHOOL_CLIENT_REASON
 
 ORIGIN = "https://jzsz.uestc.edu.cn"
 CAS = "https://idas.uestc.edu.cn/authserver"
@@ -90,6 +91,8 @@ class School:
                 r"登录|会话|未认证", str(data.get("msg", "")))):
             raise failure(AuthRequired,"session_rejected")
         if code != 0 or data.get("ok") is False:
+            if stage == 'checkin_post' and code in SCHOOL_CLIENT_CODES:
+                raise failure(ToolError,SCHOOL_CLIENT_REASON)
             raise failure(ToolError,"business_error")
         return data.get("data")
 

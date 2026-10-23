@@ -56,12 +56,12 @@ class DiagnosticsFlows(unittest.TestCase):
     def test_business_code_and_redacted_message_survive_pending_verification(self):
         secret=f.ACCOUNT['password'];student=f.ACCOUNT['student_id'];fp=f.ACCOUNT['browser_fingerprint']
         self.transport.failure=(200,4709,'学校拒绝：位置校验失败 '+secret+' '+student+' '+fp,False)
-        result=self.run_mode();self.assertEqual(result['result'],'submission_unknown');self.assertEqual(result['reason'],'record_not_confirmed')
+        result=self.run_mode();self.assertEqual(result['result'],'submission_rejected');self.assertEqual(result['reason'],'business_error')
         self.assertEqual(result['submissionAction'],'first_submit');error=result['submission']
         self.assertEqual((error['httpStatus'],error['apiCode'],error['reason']),(200,4709,'business_error'))
         self.assertIn('位置校验失败',error['schoolMessage'])
         for value in (secret,student,fp):self.assertNotIn(value,json.dumps(error,ensure_ascii=False))
-        self.assertEqual([x['status'] for x in result['verification']],['PENDING']*3)
+        self.assertEqual([x['status'] for x in result['verification']],['PENDING'])
         self.assertEqual(self.transport.post_count,1)
     def test_recheck_reuses_original_error_after_database_reopen_and_never_reposts(self):
         self.transport.failure=(200,4709,'学校拒绝',False);first=self.run_mode()
@@ -70,7 +70,7 @@ class DiagnosticsFlows(unittest.TestCase):
     def test_submit_auth_rejection_is_not_replaced_by_generic_pending_reason(self):
         self.transport.failure=(403,5000,'请重新登录',False);result=self.run_mode()
         self.assertEqual(result['submission']['httpStatus'],403);self.assertEqual(result['submission']['apiCode'],5000)
-        self.assertEqual(result['submission']['reason'],'session_rejected');self.assertEqual(result['reason'],'record_not_confirmed')
+        self.assertEqual(result['submission']['reason'],'session_rejected');self.assertEqual(result['reason'],'session_rejected')
     def test_non_200_json_preserves_school_code_separately_from_http_status(self):
         self.transport.failure=(500,4701,'业务暂不可用',False);result=self.run_mode()
         self.assertEqual((result['submission']['httpStatus'],result['submission']['apiCode']),(500,4701));self.assertEqual(result['submission']['outcome'],'error')
@@ -143,7 +143,7 @@ class DashboardDiagnostics(WebCase):
     def test_job_api_persists_original_error_redacts_and_enforces_owner_access(self):
         account=self.setup_account();transport=DiagnosticTransport(now().replace(hour=22,minute=0,second=0,microsecond=0));transport.failure=(200,4709,'拒绝 '+f.ACCOUNT['password']+' '+f.ACCOUNT['browser_fingerprint']+' '+f.ACCOUNT['student_id'],False);self.setup_runner(transport)
         jid=self.queued(account);self.worker.run_one();job=self.store.jobs(self.u1,jid)
-        self.assertEqual(job['diagnostics']['action'],'first_submit');self.assertEqual(job['diagnostics']['submission']['apiCode'],4709);self.assertEqual(len(job['diagnostics']['verification']),3)
+        self.assertEqual(job['diagnostics']['action'],'first_submit');self.assertEqual(job['diagnostics']['submission']['apiCode'],4709);self.assertEqual(len(job['diagnostics']['verification']),1)
         raw=self.req(self.c1,self.t1,'/api/jobs/'+jid).get_data(as_text=True)
         for secret in (f.ACCOUNT['password'],f.ACCOUNT['browser_fingerprint']):self.assertNotIn(secret,raw)
         self.assertEqual(self.req(self.c2,self.t2,'/api/jobs/'+jid).status_code,404);self.assertEqual(self.req(self.c2,self.t2,'/api/jobs').get_json()['jobs'],[])

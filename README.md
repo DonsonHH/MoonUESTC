@@ -2,7 +2,7 @@
 
 # 晚安成电 · MoonUESTC
 
-**设置一次每日计划，到时查看学校确认结果。**
+**管理学校认证、签到计划与学校确认记录。**
 
 [![Privacy checks](https://github.com/DonsonHH/MoonUESTC/actions/workflows/privacy-check.yml/badge.svg)](https://github.com/DonsonHH/MoonUESTC/actions/workflows/privacy-check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-7c66d4.svg)](LICENSE)
@@ -17,6 +17,12 @@
 </picture>
 
 </div>
+
+## 当前学校入口要求
+
+学校当前返回 `46001` 等打卡授权错误，要求在微信 **「成电智慧学工」小程序** 内进入打卡应用。学校密码校验成功、Cookie 有效，并不代表已获得打卡提交授权。
+
+检测到此要求后，本站暂停自动提交，保留已有计划与历史记录。请在官方小程序中完成签到，再点击 **同步今日学校记录**。重新验证密码不会解除小程序入口要求；本站不会生成或伪造学校的操作凭证。
 
 ## 为什么用它
 

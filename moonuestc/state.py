@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .errors import ToolError
 from .diagnostics import submission_details
+from .school_policy import SCHOOL_CLIENT_CODES, SCHOOL_CLIENT_REASON, requires_school_client
 
 class InteractiveAuthCooldown(ToolError):
     def __init__(self,retry_after):
@@ -79,7 +80,28 @@ class State:
                 token_hash TEXT PRIMARY KEY,account TEXT NOT NULL,started_at REAL NOT NULL,
                 completed INTEGER NOT NULL DEFAULT 0);
             CREATE INDEX IF NOT EXISTS interactive_auth_account_time ON interactive_auth_flows(account,started_at);
+            CREATE TABLE IF NOT EXISTS school_requirements (
+                operation TEXT PRIMARY KEY,reason TEXT NOT NULL,api_code INTEGER NOT NULL,detected_at REAL NOT NULL);
         """)
+        # Older runners kept explicit school rejections as unknown claims. Recover
+        # the service requirement without rewriting claims or historical jobs.
+        if not self.school_client_requirement():
+            for row in self.db.execute('SELECT details FROM submission_diagnostics ORDER BY rowid DESC'):
+                details=json.loads(row[0])
+                if requires_school_client(details):
+                    self.require_school_client(details['apiCode'])
+                    break
+
+    def school_client_requirement(self):
+        row=self.db.execute("SELECT reason FROM school_requirements WHERE operation='checkin'").fetchone()
+        return row[0] if row else None
+
+    def require_school_client(self,api_code):
+        if type(api_code) is not int or api_code not in SCHOOL_CLIENT_CODES:return False
+        with self.db:
+            self.db.execute('INSERT INTO school_requirements VALUES(?,?,?,?) ON CONFLICT(operation) DO NOTHING',
+                            ('checkin',SCHOOL_CLIENT_REASON,api_code,time.time()))
+        return True
 
     def begin_interactive_login(self,account):
         """One owner-operated flow per permit, including its final identity check.
@@ -152,6 +174,7 @@ class State:
         safe=submission_details(details)
         with self.db:
             self.db.execute("UPDATE submission_diagnostics SET details=? WHERE account=? AND day=?",(json.dumps(safe,ensure_ascii=False,allow_nan=False),account,day))
+        if requires_school_client(safe):self.require_school_client(safe['apiCode'])
 
     def submission(self,account,day):
         row=self.db.execute("SELECT details FROM submission_diagnostics WHERE account=? AND day=?",(account,day)).fetchone()

@@ -1700,7 +1700,13 @@
       "path": "tests/test_variation_migration.py",
       "match_sha256": "b8c3bcfbf08d66191a2d0f996f686727ee202e5ff67def3b4969f9b082967f15",
       "reason": "Reviewed offline fixture operator label/password for daily scheduling and migration regression. No real account or network request; live private markers remain unwaivable."
+    },
+    {
+      "rule": "credential_assignment",
+      "path": "tests/test_school_client_requirement.py",
+      "match_sha256": "7f094c202ebc041ffe76ca9a0e99cd062a5611f632e2b0cb454b8da9e6f12bfd",
+      "reason": "Reviewed offline synthetic second-student fixture for school-entry restriction isolation. No real identity, credentials or network request; live private markers remain unwaivable."
     }
   ],
-  "reviewed_donson_feature_version": "0.5.1+donson.16"
+  "reviewed_donson_feature_version": "0.5.1+donson.17"
 }

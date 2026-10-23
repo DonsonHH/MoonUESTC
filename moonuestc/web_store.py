@@ -26,6 +26,7 @@ from .web_errors import WebError
 from .daily_plan import normalize_variation,planned_time
 from .scheduling import reserve_slot,slot_description,slot_target,retry_reservation
 from .notice import VERSION as NOTICE_VERSION
+from .school_policy import explain_result
 
 
 def text(value,field,minimum=1,maximum=80):
@@ -327,9 +328,10 @@ class WebStore:
                                    (account_key(payload),now().date().isoformat())).fetchone()
             confirmed_today=bool(claim and claim[0]=='confirmed')
             auth_reason=state.auth_requirement(account_key(payload))
+            checkin_reason=state.school_client_requirement()
         finally: state.close()
         variation=normalize_variation(payload.get('variation'))
-        last=json.loads(row['last_result']) if row['last_result'] else None
+        last=explain_result(json.loads(row['last_result'])) if row['last_result'] else None
         school_window=(last or {}).get('checkinWindow')
         try:target=planned_time(payload,row['run_at'],now().date().isoformat(),self.execution_window,school_window)
         except (ToolError,KeyError,ValueError):target=None
@@ -337,9 +339,9 @@ class WebStore:
             reservation=db.execute('SELECT minute FROM web_schedule_slots WHERE account_id=?',(row['id'],)).fetchone()
             verified=db.execute('SELECT verified_at FROM portal_bindings WHERE account_id=?',(row['id'],)).fetchone()
             today_job=db.execute("SELECT id,state,source,result,created_at FROM web_jobs WHERE account_id=? AND business_date=? AND mode='checkin' ORDER BY created_at DESC,id DESC LIMIT 1",(row['id'],now().date().isoformat())).fetchone()
-        today_result=json.loads(today_job['result']) if today_job and today_job['result'] else None
+        today_result=explain_result(json.loads(today_job['result'])) if today_job and today_job['result'] else None
         recorded_today=confirmed_today or bool(today_result and today_result.get('result') in ('confirmed','already_recorded') and today_result.get('status') in ('CHECKED_IN','EXEMPT','STUDENT_REPORTED','INSTRUCTOR_REPORTED'))
-        if not auth_reason and row['last_run_at'] and row['last_run_at']>=(verified[0] if verified else 0) and (last or {}).get('reason') in ('need_manual_captcha','need_manual_mfa','login_rejected','daily_login_limit'):
+        if not auth_reason and row['last_run_at'] and row['last_run_at']>=(verified[0] if verified else 0) and (last or {}).get('reason') in ('need_manual_captcha','need_manual_mfa','login_rejected','daily_login_limit','school_sync_login_required'):
             auth_reason=last['reason']
         if self.execution_window:target=slot_target(payload,now().date().isoformat(),reservation[0]) if reservation else None
         return {'id':row['id'],'owner_id':row['owner_id'],'owner_name':row['owner_name'],'owner_username':row['owner_username'],
@@ -353,9 +355,10 @@ class WebStore:
                 'variation':variation,'planned_run_at':target,'location_open':self.location_open(payload),'execution_window':self.execution_window,
                 'schedule_slot':slot_description(reservation[0]) if reservation else None,
                 'school_auth_required':bool(auth_reason),'school_auth_reason':auth_reason,
+                'school_checkin_required':bool(checkin_reason),
                 'hosting_notice_accepted':self.notice_accepted({'id':row['owner_id'],'role':row['owner_role']}),'hosting_notice_required':self.require_notice,
                 'configuration_checked':bool(row['last_run_at'] and row['last_run_at']>=row['updated_at'] and (last or {}).get('result') in ('dry_run_ready','confirmed')),
-                'last_result':json.loads(row['last_result']) if row['last_result'] else None,
+                'last_result':last,
                 'last_run_at':row['last_run_at'],**location_details(payload)}
 
     def accounts(self,actor):
@@ -509,7 +512,7 @@ class WebStore:
         result=[]
         for r in rows:
             result.append({key:r[key] for key in ('id','account_id','label','owner_name','mode','source','business_date','state','created_at','started_at','finished_at','attempt','available_at','execute_before')} |
-                          {'queue_position':r['queue_position'] if r['state']=='queued' else None,'result':json.loads(r['result']) if r['result'] else None,'diagnostics':json.loads(r['diagnostic_payload']) if r['diagnostic_payload'] else None})
+                          {'queue_position':r['queue_position'] if r['state']=='queued' else None,'result':explain_result(json.loads(r['result'])) if r['result'] else None,'diagnostics':json.loads(r['diagnostic_payload']) if r['diagnostic_payload'] else None})
         if job_id and not result: raise WebError(404,'not_found','任务不存在。')
         return result[0] if job_id else result
 
